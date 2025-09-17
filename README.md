@@ -12,20 +12,24 @@ A modern, web-based **Smart Supply Chain Management System** designed to automat
 
 ### 👨‍💼 Dealer Module
 - Add, edit, and manage inventory items
-- Set **preset reorder levels** per item
+- Set preset reorder levels per item
 - Auto-generate procurement requests when stock falls below thresholds
-- View supplier offers and accept or reject them
+- View supplier offers and accept/reject them
 - Track order status and update inventory on fulfillment
 
 ### 🤝 Supplier Module
-- View all open procurement requests from dealers
+- View open procurement requests from dealers
 - Submit competitive offers with pricing and details
-- Automatically receive orders upon offer acceptance
+- Receive orders automatically upon offer acceptance
 
 ### 📦 Order Management
-- Orders are auto-generated upon offer acceptance
-- Both dealers and suppliers can track their orders
-- Dealers can mark orders as fulfilled and update stock levels
+- Orders auto-generated upon offer acceptance
+- Track orders for both dealers and suppliers
+- Dealers can mark orders as fulfilled and update stock
+
+### 🔔 Notification System
+- Real-time notifications for procurement, offers, and orders
+- Notification UI separated for clarity and maintainability
 
 ---
 
@@ -41,25 +45,74 @@ A modern, web-based **Smart Supply Chain Management System** designed to automat
 
 ---
 
-## 📁 Key Pages
+## 📁 Project Structure
 
-- `inventory.html` – Manage inventory items (dealer)
-- `procurement.html` – Auto-procurement logic + offer management
-- `deals.html` – Supplier portal for sending offers
-- `orders.html` – Dealer’s order dashboard
+```
+Smart Supply Chain System/
+ frontend/
+│   ├── dashboard.html, dashboardstyle.css
+│   ├── inventory.html, inventorystyle.css
+│   ├── procurement.html, procurementstyle.css
+│   ├── MarketPlace.html, MarketPlacestyle.css
+│   ├── orders.html, ordersstyle.css
+│   ├── offers.html, offers.css
+│   ├── notifications.html, notificationsstyle.css
+│   ├── profile.html, profile.css
+│   ├── registry.html
+│   ├── supplier-details.html, supplier-details.css
+│   ├── navbar.html, navbar.css
+│   ├── loginstyle.css
+│   └── ...
+├── backend/
+│   ├── firebase-config.js
+│   ├── inventory.js
+│   ├── procurement.js
+│   ├── MarketPlace.js
+│   ├── offers.js
+│   ├── order.js
+│   ├── notifications-listener.js
+│   ├── notifications-helper.js
+│   ├── notifications-page.js
+│   ├── offers-badge-listener.js
+│   ├── navbar.js
+│   ├── profile.js
+│   ├── loginscript.js
+│   ├── registerscript.js
+│   ├── supplier-details.js
+│   ├── toast.js
+│   └── ...
+├── index.html
+└── README.me
 
 ---
 
-## 🔮 Upcoming Features (Planned)
+## 📄 Key Modules & Pages
 
-- ✅ Notification system (email/SMS)
-- 🔜 **Blockchain integration** for procurement lifecycle tracking
+- **Inventory:** `inventory.html`, `inventory.js`
+- **Procurement:** `procurement.html`, `procurement.js`
+- **Marketplace (Supplier):** `MarketPlace.html`, `MarketPlace.js`
+- **Orders:** `orders.html`, `order.js`
+- **Offers:** `offers.html`, `offers.js`
+- **Notifications:** `notifications.html`, `notifications-listener.js`, `notifications-helper.js`
+- **Profile:** `profile.html`, `profile.js`
+- **Supplier Details:** `supplier-details.html`, `supplier-details.js`
+- **Navigation:** `navbar.html`, `navbar.js`
+- **Authentication:** `loginscript.js`, `registerscript.js`
+- **UI Styles:** CSS files per module
+
+---
+
+## 🔮 Upcoming Features
+
+- 🔜 Blockchain integration for procurement lifecycle tracking
 - 🔜 Smart contract-based offer acceptance
 - 🔜 PDF invoices and procurement reports
 
 ---
 
-## 📸 Screenshots (Coming Soon)
+## 📸 Screenshots
+
+Screenshots coming soon!
 
 ---
 
@@ -67,9 +120,11 @@ A modern, web-based **Smart Supply Chain Management System** designed to automat
 
 To run locally:
 
-1. Clone the repo
+1. Clone the repository:
    ```bash
    git clone https://github.com/Lithishc/Smart-Supply-Chain-System.git
+   ```
+2. Open the project folder in [Visual Studio Code](https://code.visualstudio.com/).
 
 ## License
 
