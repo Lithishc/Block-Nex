@@ -1,6 +1,31 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { collection, getDocs, doc, getDoc, updateDoc, query,where,collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+// Digital contract helpers (same as in order.js)
+async function getSupplierGSTIN(supplierUid) {
+  const infoRef = doc(db, "info", supplierUid);
+  const infoSnap = await getDoc(infoRef);
+  if (infoSnap.exists()) {
+    return infoSnap.data().gstNumber || "";
+  }
+  return "";
+}
+function generateContractText(order, dealerGSTIN, supplierGSTIN) {
+  return `Digital Supply Contract\n\nOrder ID: ${order.globalOrderId || "-"}\nItem: ${order.itemName}\nQuantity: ${order.quantity}\nSupplier: ${order.supplier}\nSupplier GSTIN: ${supplierGSTIN}\nDealer GSTIN: ${dealerGSTIN}\nPrice: ₹${order.price}\nDetails: ${order.details}\nDate: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}\n\nBy signing, both parties agree to the above terms.`;
+}
+async function saveContractSignature(orderRef, who, signature) {
+  await updateDoc(orderRef, { [`contractSignatures.${who}`]: signature });
+}
+function downloadCertificate(filename, text) {
+  const blob = new Blob([text], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
 
@@ -106,6 +131,80 @@ window.UpdateTracking = async (uid, globalOrderId) => {
   // Only allow statuses after the current one
   const availableStatuses = statusOptions.slice(currentStatusIndex + 1);
 
+  // --- Digital Contract Section ---
+  let contractSection = "";
+  let canSign = false;
+  let canDownload = false;
+  let dealerSigned = false;
+  let supplierSigned = false;
+  let contractText = "";
+  let dealerGSTIN = order.dealerGSTIN || "";
+  let supplierGSTIN = order.supplierGSTIN || "";
+  let contractSignatures = order.contractSignatures || {};
+  let currentUserUid = uid;
+  let isDealer = (order.dealerUid === currentUserUid);
+  let isSupplier = (order.supplierUid === currentUserUid);
+
+  // Always fetch GSTINs
+  if (!dealerGSTIN && order.dealerUid) {
+    const dealerInfoRef = doc(db, "info", order.dealerUid);
+    const dealerInfoSnap = await getDoc(dealerInfoRef);
+    if (dealerInfoSnap.exists()) {
+      dealerGSTIN = dealerInfoSnap.data().gstNumber || order.dealerUid;
+    } else {
+      dealerGSTIN = order.dealerUid;
+    }
+  }
+  if (!supplierGSTIN && order.supplierUid) {
+    supplierGSTIN = await getSupplierGSTIN(order.supplierUid);
+  }
+  contractText = generateContractText(order, dealerGSTIN, supplierGSTIN);
+  dealerSigned = !!(contractSignatures && contractSignatures.dealer);
+  supplierSigned = !!(contractSignatures && contractSignatures.supplier);
+
+  // Fix: Allow dealer to sign if not signed, supplier to sign if dealer has signed and supplier hasn't
+  if (isDealer && !dealerSigned) {
+    canSign = true;
+  } else if (isSupplier && dealerSigned && !supplierSigned) {
+    canSign = true;
+  }
+
+  if (dealerSigned && supplierSigned) {
+    canDownload = true;
+  }
+
+  contractSection = `
+    <div style="margin:16px 0;padding:12px;border:1px solid #aaa;background:#f9f9f9;">
+      <h3>Digital Contract</h3>
+      <pre style="white-space:pre-wrap;font-size:0.95em;">${contractText}</pre>
+      <div style="margin:8px 0;">
+        <b>Dealer Signed:</b> ${dealerSigned ? "✅" : "❌"} <br>
+        <b>Supplier Signed:</b> ${supplierSigned ? "✅" : "❌"}
+      </div>
+      <div style="margin:8px 0 0 0;">
+        ${canSign ? `<button id="sign-contract-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
+        ${canDownload ? `<button id="download-contract-btn">Download Certificate</button>` : ""}
+      </div>
+      <div style="color:#e0103a;font-size:0.95em;margin-top:6px;">
+        ${!dealerSigned ? "Dealer must sign first." : (!supplierSigned && isSupplier ? "Please sign to proceed." : "")}
+      </div>
+    </div>
+  `;
+
+  // Only allow supplier to update status after both have signed
+  let statusSection = "";
+  if (dealerSigned && supplierSigned) {
+    statusSection = `<div style=\"margin-bottom:16px;\">
+        <label for=\"status-select\">Update Status:</label>
+        <select id=\"status-select\" ${availableStatuses.length === 0 ? "disabled" : ""}>
+         ${availableStatuses.map(s => `<option value=\"${s}\">${s}</option>`).join("")}
+        </select>
+        <button id=\"update-status-btn\" ${availableStatuses.length === 0 ? "disabled" : ""}>Update</button>
+      </div>`;
+  } else {
+    statusSection = `<div style=\"color:#e0103a;margin-bottom:16px;\">Both parties must sign the contract before updating status.</div>`;
+  }
+
   let html = `
     <div>
       <button class="close-btn" onclick="document.getElementById('order-tracking-popup').remove()">&times;</button>
@@ -115,13 +214,8 @@ window.UpdateTracking = async (uid, globalOrderId) => {
         <b>Item:</b> ${order.itemName}<br>
         <b>Current Status:</b> ${order.status}
       </div>
-      <div style="margin-bottom:16px;">
-        <label for="status-select">Update Status:</label>
-        <select id="status-select" ${availableStatuses.length === 0 ? "disabled" : ""}>
-         ${availableStatuses.map(s => `<option value="${s}">${s}</option>`).join("")}
-        </select>
-<button id="update-status-btn" ${availableStatuses.length === 0 ? "disabled" : ""}>Update</button>
-      </div>
+      ${contractSection}
+      ${statusSection}
       <h3>Updates:</h3>
       <table>
         <thead>
@@ -145,6 +239,33 @@ window.UpdateTracking = async (uid, globalOrderId) => {
   popup.id = 'order-tracking-popup';
   popup.innerHTML = html;
   document.body.appendChild(popup);
+
+  // Add contract signing and download logic
+  setTimeout(() => {
+    const signBtn = document.getElementById('sign-contract-btn');
+    const downloadBtn = document.getElementById('download-contract-btn');
+    if (signBtn) {
+      signBtn.onclick = async () => {
+        let signature = "";
+        if (isDealer) {
+          signature = dealerGSTIN + "-signed-" + new Date().toISOString();
+          await saveContractSignature(globalOrderRef, 'dealer', signature);
+        } else if (isSupplier) {
+          signature = supplierGSTIN + "-signed-" + new Date().toISOString();
+          await saveContractSignature(globalOrderRef, 'supplier', signature);
+        }
+        alert('Contract signed successfully!');
+        document.getElementById('order-tracking-popup').remove();
+        window.UpdateTracking(uid, globalOrderId); // Refresh popup
+      };
+    }
+    if (downloadBtn) {
+      downloadBtn.onclick = () => {
+        let certText = contractText + `\n\nDealer Signature: ${contractSignatures.dealer || "-"}\nSupplier Signature: ${contractSignatures.supplier || "-"}`;
+        downloadCertificate(`Order_${globalOrderId}_Certificate.txt`, certText);
+      };
+    }
+  }, 100);
 
   // --- Fix: Hide update status section if status is not in allowed options ---
   const statusSelect = document.getElementById('status-select');
