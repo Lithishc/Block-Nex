@@ -243,7 +243,7 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
     supplierResponses: updatedOffers
   });
 
-  // 1. Create global order
+  // 1. Create global order FIRST and use its ID everywhere
   const globalOrderRef = await addDoc(collection(db, "globalOrders"), {
     dealerUid: uid,
     supplierUid: acceptedOffer.supplierUid,
@@ -262,8 +262,8 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
   });
   const globalOrderId = globalOrderRef.id;
 
-  // 2. Store reference in dealer's orders
-  await addDoc(collection(db, "users", uid, "orders"), {
+  // 2. Store reference in dealer's orders, using globalOrderId as the doc ID
+  await setDoc(doc(db, "users", uid, "orders", globalOrderId), {
     globalOrderId,
     ...reqData,
     offerId: acceptedOffer.offerId,
@@ -271,12 +271,14 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
     price: acceptedOffer.price,
     details: acceptedOffer.details,
     status: "ordered",
-    createdAt: new Date()
+    createdAt: new Date(),
+    dealerUid: uid,
+    supplierUid: acceptedOffer.supplierUid
   });
 
-  // 3. Store reference in supplier's orderFulfilment
+  // 3. Store reference in supplier's orderFulfilment, using globalOrderId as the doc ID
   if (acceptedOffer.supplierUid) {
-    await addDoc(collection(db, "users", acceptedOffer.supplierUid, "orderFulfilment"), {
+    await setDoc(doc(db, "users", acceptedOffer.supplierUid, "orderFulfilment", globalOrderId), {
       globalOrderId,
       ...reqData,
       offerId: acceptedOffer.offerId,
@@ -284,7 +286,9 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
       price: acceptedOffer.price,
       details: acceptedOffer.details,
       status: "ordered",
-      createdAt: new Date()
+      createdAt: new Date(),
+      dealerUid: uid,
+      supplierUid: acceptedOffer.supplierUid
     });
   }
 

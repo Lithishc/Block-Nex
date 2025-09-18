@@ -1,10 +1,9 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { collection, getDocs, doc, updateDoc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, query, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
 // Digital contract helpers
 async function getSupplierGSTIN(supplierUid) {
-  // Fetch GSTIN from supplier info
   const infoRef = doc(db, "info", supplierUid);
   const infoSnap = await getDoc(infoRef);
   if (infoSnap.exists()) {
@@ -17,9 +16,23 @@ function generateContractText(order, dealerGSTIN, supplierGSTIN) {
   return `Digital Supply Contract\n\nOrder ID: ${order.globalOrderId || "-"}\nItem: ${order.itemName}\nQuantity: ${order.quantity}\nSupplier: ${order.supplier}\nSupplier GSTIN: ${supplierGSTIN}\nDealer GSTIN: ${dealerGSTIN}\nPrice: ₹${order.price}\nDetails: ${order.details}\nDate: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}\n\nBy signing, both parties agree to the above terms.`;
 }
 
-async function saveContractSignature(orderRef, who, signature) {
-  // who: 'dealer' or 'supplier'
-  await updateDoc(orderRef, { [`contractSignatures.${who}`]: signature });
+async function saveContractSignature(globalOrderId, who, signature) {
+  // Update in globalOrders
+  const globalOrderRef = doc(db, "globalOrders", globalOrderId);
+  await updateDoc(globalOrderRef, { [`contractSignatures.${who}`]: signature });
+
+  // Update in all user orders referencing this globalOrderId
+  const ordersQuery = query(collectionGroup(db, "orders"), where("globalOrderId", "==", globalOrderId));
+  const ordersSnap = await getDocs(ordersQuery);
+  for (const docSnap of ordersSnap.docs) {
+    await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
+  }
+  // Update in supplier's orderFulfilment
+  const fulfilQuery = query(collectionGroup(db, "orderFulfilment"), where("globalOrderId", "==", globalOrderId));
+  const fulfilSnap = await getDocs(fulfilQuery);
+  for (const docSnap of fulfilSnap.docs) {
+    await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
+  }
 }
 
 function downloadCertificate(filename, text) {
@@ -52,14 +65,11 @@ async function loadOrders(uid) {
   }
   ordersSnap.forEach((docSnap) => {
     const order = docSnap.data();
-    const orderId = docSnap.id;
+    const orderId = order.globalOrderId || docSnap.id; // Always use globalOrderId
     const date = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
     let globalProcurementId = order.globalProcurementId || (order.acceptedOffer && order.acceptedOffer.globalProcurementId) || null;
-
-    // --- FIX: Use correct quantity field ---
     let quantity = order.quantity ?? order.requestedQty ?? (order.acceptedOffer && order.acceptedOffer.requestedQty) ?? "-";
 
-    // Show the order status, then the Track button
     let statusCell = `
       <span class="status-text">${order.status}</span>
       <button class="pill-btn" onclick="window.showTracking('${uid}', '${orderId}', '${globalProcurementId}')">Track</button>
@@ -84,7 +94,7 @@ async function loadOrders(uid) {
   });
 }
 
-window.markProcurementFulfilled = async (uid, globalProcurementId, globalOrderId) => {
+window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId) => {
   // 1. Mark as fulfilled in globalProcurementRequests
   const globalQuery = query(
     collection(db, "globalProcurementRequests"),
@@ -122,25 +132,12 @@ window.markProcurementFulfilled = async (uid, globalProcurementId, globalOrderId
   // 4. Mark as fulfilled in globalOrders
   if (globalOrderId) {
     await updateDoc(doc(db, "globalOrders", globalOrderId), { status: "fulfilled" });
-  } else {
-    // Try to find globalOrderId from user's orders
-    const ordersQuery = query(
-      collection(db, "users", uid, "orders"),
-      where("globalProcurementId", "==", globalProcurementId)
-    );
-    const ordersSnap = await getDocs(ordersQuery);
-    for (const orderDoc of ordersSnap.docs) {
-      const orderData = orderDoc.data();
-      if (orderData.globalOrderId) {
-        await updateDoc(doc(db, "globalOrders", orderData.globalOrderId), { status: "fulfilled" });
-      }
-    }
   }
 
   // 5. Mark as fulfilled in user's orders
   const ordersQuery2 = query(
     collection(db, "users", uid, "orders"),
-    where("globalProcurementId", "==", globalProcurementId)
+    where("globalOrderId", "==", globalOrderId)
   );
   const ordersSnap2 = await getDocs(ordersQuery2);
   for (const orderDoc of ordersSnap2.docs) {
@@ -151,30 +148,16 @@ window.markProcurementFulfilled = async (uid, globalProcurementId, globalOrderId
   loadOrders(uid);
 };
 
-window.showTracking = async (uid, orderId, globalProcurementId) => {
-  // Fetch order
-  const orderRef = doc(db, "users", uid, "orders", orderId);
-  const orderSnap = await getDoc(orderRef);
-  if (!orderSnap.exists()) return;
-  const order = orderSnap.data();
+window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
+  // Fetch order from globalOrders
+  const globalOrderRef = doc(db, "globalOrders", globalOrderId);
+  const globalOrderSnap = await getDoc(globalOrderRef);
+  if (!globalOrderSnap.exists()) return;
+  const order = globalOrderSnap.data();
 
-  // Try to get globalOrderId
-  const globalOrderId = order.globalOrderId || null;
-
-  // Fetch tracking from globalOrders if available
+  // Fetch tracking from globalOrders
   let tracking = order.tracking || [];
   let status = order.status;
-  if (globalOrderId) {
-    const globalOrderRef = doc(db, "globalOrders", globalOrderId);
-    const globalOrderSnap = await getDoc(globalOrderRef);
-    if (globalOrderSnap.exists()) {
-      const globalOrder = globalOrderSnap.data();
-      tracking = globalOrder.tracking || tracking;
-      status = globalOrder.status || status;
-    }
-  }
-
-  // Build tracking UI (use popup style)
 
   // --- Digital Contract Section ---
   let contractSection = "";
@@ -192,7 +175,6 @@ window.showTracking = async (uid, orderId, globalProcurementId) => {
 
   // Try to get GSTINs if not present
   if (!dealerGSTIN && order.dealerUid) {
-    // For demo, use UID as GSTIN fallback
     dealerGSTIN = order.dealerUid;
   }
   if (!supplierGSTIN && order.supplierUid) {
@@ -236,20 +218,19 @@ window.showTracking = async (uid, orderId, globalProcurementId) => {
   if ((status === "delivered" || status === "Delivered") && globalProcurementId && dealerSigned && supplierSigned) {
     markFulfilledBtn = `
       <div style="margin-top:14px;">
-        <button class="pill-btn accept" onclick="window.markProcurementFulfilled('${uid}','${globalProcurementId}','${globalOrderId}')">
+        <button class="pill-btn accept" onclick="window.markProcurementFulfilled('${uid}','${globalOrderId}','${globalProcurementId}')">
           Mark as Fulfilled & Update Inventory
         </button>
       </div>
     `;
   }
 
-
   let html = `
     <div class="popup-content" style="max-height:80vh;overflow-y:auto;">
       <button class="close-btn" onclick="document.getElementById('order-tracking-popup').remove()">&times;</button>
       <h2>Order Tracking</h2>
       <div style="margin-bottom:16px;">
-        <b>Order ID:</b> ${orderId}<br>
+        <b>Order ID:</b> ${globalOrderId}<br>
         <b>Item:</b> ${order.itemName}<br>
         <b>Current Status:</b> ${status}
         ${markFulfilledBtn}
@@ -275,7 +256,6 @@ window.showTracking = async (uid, orderId, globalProcurementId) => {
     </div>
   `;
 
-  // --- FIX: Use popup overlay with .popup class ---
   let popup = document.createElement('div');
   popup.id = 'order-tracking-popup';
   popup.className = 'popup';
@@ -291,20 +271,20 @@ window.showTracking = async (uid, orderId, globalProcurementId) => {
         let signature = "";
         if (isDealer) {
           signature = dealerGSTIN + "-signed-" + new Date().toISOString();
-          await saveContractSignature(orderRef, 'dealer', signature);
+          await saveContractSignature(globalOrderId, 'dealer', signature);
         } else if (isSupplier) {
           signature = supplierGSTIN + "-signed-" + new Date().toISOString();
-          await saveContractSignature(orderRef, 'supplier', signature);
+          await saveContractSignature(globalOrderId, 'supplier', signature);
         }
         alert('Contract signed successfully!');
         document.getElementById('order-tracking-popup').remove();
-        window.showTracking(uid, orderId, globalProcurementId); // Refresh popup
+        window.showTracking(uid, globalOrderId, globalProcurementId); // Refresh popup
       };
     }
     if (downloadBtn) {
       downloadBtn.onclick = () => {
         let certText = contractText + `\n\nDealer Signature: ${contractSignatures.dealer || "-"}\nSupplier Signature: ${contractSignatures.supplier || "-"}`;
-        downloadCertificate(`Order_${orderId}_Certificate.txt`, certText);
+        downloadCertificate(`Order_${globalOrderId}_Certificate.txt`, certText);
       };
     }
   }, 100);
