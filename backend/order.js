@@ -36,13 +36,19 @@ async function saveContractSignature(globalOrderId, who, signature) {
 }
 
 function downloadCertificate(filename, text) {
-  const blob = new Blob([text], { type: 'text/plain' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  // Create a temporary anchor element for download
+  const file = new File([text], filename, { type: "text/plain" });
+  const tempUrl = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.style.display = "none";
+  anchor.href = tempUrl;
+  anchor.setAttribute("download", filename);
+  document.body.appendChild(anchor);
+  anchor.click();
+  setTimeout(() => {
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(tempUrl);
+  }, 100);
 }
 
 const tableBody = document.querySelector('#orders-table tbody');
