@@ -251,6 +251,8 @@ window.UpdateTracking = async (uid, globalOrderId) => {
   setTimeout(() => {
     const signBtn = document.getElementById('sign-contract-btn');
     const downloadBtn = document.getElementById('download-contract-btn');
+    const updateStatusBtn = document.getElementById('update-status-btn');
+    const statusSelect = document.getElementById('status-select');
     if (signBtn) {
       signBtn.onclick = async () => {
         let signature = "";
@@ -270,6 +272,31 @@ window.UpdateTracking = async (uid, globalOrderId) => {
       downloadBtn.onclick = () => {
         let certText = contractText + `\n\nDealer Signature: ${contractSignatures.dealer || "-"}\nSupplier Signature: ${contractSignatures.supplier || "-"}`;
         downloadCertificate(`Order_${globalOrderId}_Certificate.txt`, certText);
+      };
+    }
+    if (updateStatusBtn && statusSelect) {
+      updateStatusBtn.onclick = async () => {
+        const newStatus = statusSelect.value;
+        if (!newStatus) return;
+        // Update status in globalOrders
+        await updateDoc(doc(db, "globalOrders", globalOrderId), { status: newStatus });
+        // Optionally, add to tracking history
+        const trackingUpdate = {
+          date: new Date().toISOString(),
+          status: newStatus,
+          note: `${isSupplier ? "Supplier" : "Dealer"} updated status.`
+        };
+        const globalOrderRef = doc(db, "globalOrders", globalOrderId);
+        const globalOrderSnap = await getDoc(globalOrderRef);
+        if (globalOrderSnap.exists()) {
+          const orderData = globalOrderSnap.data();
+          const trackingArr = orderData.tracking || [];
+          trackingArr.push(trackingUpdate);
+          await updateDoc(globalOrderRef, { tracking: trackingArr });
+        }
+        showToast('Order status updated!');
+        document.getElementById('order-tracking-popup').remove();
+        window.UpdateTracking(uid, globalOrderId); // Refresh popup
       };
     }
   }, 100);
