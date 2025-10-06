@@ -348,6 +348,78 @@ th {
   background: #003366;
 }
 
+.toggle-switch {
+  display: inline-block;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+}
+.toggle-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 54px;
+  height: 28px;
+  background: #ccc;
+  border-radius: 14px;
+  position: relative;
+  transition: background 0.2s;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+.toggle-track.on {
+  background: #4cd964;
+}
+.toggle-label {
+  font-size: 0.95em;
+  font-weight: 600;
+  pointer-events: none;
+  transition: color 0.2s;
+  color: #888;
+}
+.toggle-track.on .toggle-label {
+  color: #fff;
+}
+.toggle-knob {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 2px 6px #0002;
+  margin-left: 0;
+  margin-right: 0;
+  /* Move knob to right when ON */
+  transform: translateX(0);
+}
+.toggle-track.on .toggle-knob {
+  transform: translateX(26px);
+}
+.toggle-switch:hover .toggle-track {
+  box-shadow: 0 0 8px #4cd96455;
+  background: #b3e6c1;
+}
+.ai-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 0.95em;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.seasonal-tag {
+  background: #ffe066;
+  color: #333;
+}
+.ml-tag {
+  background: #cce5ff;
+  color: #0056b3;
+}
+.ai-tag:hover {
+  background: #ffd700;
+}
 @media (max-width: 900px) {
   .navbar {
     flex-wrap: wrap;

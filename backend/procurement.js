@@ -3,6 +3,8 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/f
 import { collection, getDocs, doc, updateDoc, addDoc, query, where, getDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
+import { getSeasonalDemand } from "./chatgpt-helper.js";
+import { getInventoryTrendPrediction } from "./ml-inventory-trend.js";
 
 const tableBody = document.querySelector('#procurement-table tbody');
 
@@ -76,25 +78,53 @@ async function loadInventoryForProcurement(uid) {
       offersHtml = "No offers yet";
     }
 
+    // 1. ChatGPT Seasonal Demand
+    let seasonalTag = "";
+    try {
+      const seasonal = await getSeasonalDemand(item.itemName);
+      if (seasonal?.demand) {
+        const recText = seasonal.recommendation || "Seasonal ↑";
+        seasonalTag = `<span class="ai-tag seasonal-tag" title="${seasonal.reason}">${recText}</span>`;
+      }
+    } catch (e) {
+      seasonalTag = "";
+    }
+
+    // 2. Local ML Trend
+    let mlTag = "";
+    try {
+      const trend = await getInventoryTrendPrediction(uid, item.itemID);
+      if (trend?.recommendation) {
+        mlTag = `<span class="ai-tag ml-tag" title="${trend.reason}">${trend.recommendation}</span>`;
+      }
+    } catch (e) {
+      mlTag = "";
+    }
+
+    // Render row with tags beside Request Qty
     tableBody.innerHTML += `
       <tr>
-       <td>${item.itemID}</td>
+        <td>${item.itemID}</td>
         <td>${item.itemName}</td>
         <td>${item.quantity}</td>
         <td>
-          <input type="checkbox" ${presetMode ? "checked" : ""} 
-            onchange="window.togglePreset('${itemDoc.id}', this.checked)">
+          <span class="toggle-switch" onclick="window.togglePreset('${itemDoc.id}', ${!item.presetMode})">
+            <span class="toggle-track ${item.presetMode ? 'on' : ''}">
+              <span class="toggle-knob"></span>
+              <span class="toggle-label">${item.presetMode ? 'On' : 'Off'}</span>
+            </span>
+          </span>
         </td>
         <td>
-          <input type="number" min="1" value="${item.presetQty || ""}" style="width:60px;"
-            onchange="window.setPresetQty('${itemDoc.id}', this.value)">
+          <input type="number" min="0" value="${item.presetQty || ""}" style="width:60px;" onchange="window.setPresetQty('${itemDoc.id}', this.value)">
         </td>
         <td>
-          <input type="number" min="1" value="${item.requestQty || ""}" style="width:60px;"
-            onchange="window.setRequestQty('${itemDoc.id}', this.value)">
+          <input type="number" min="1" value="${requestQty || ""}" style="width:60px;" onchange="window.setRequestQty('${itemDoc.id}', this.value)">
+          ${seasonalTag}
+          ${mlTag}
         </td>
-        <td>${requestStatus}</td>
-        <td>${offersHtml}</td>
+        <td>${item.requestStatus || "-"}</td>
+        <td>${item.supplierOffers || "-"}</td>
       </tr>
     `;
   }

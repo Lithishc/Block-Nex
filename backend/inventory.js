@@ -56,6 +56,7 @@ onAuthStateChanged(auth, async (user) => {
     } else {
       // Add new item
       await addDoc(collection(db, "users", user.uid, "inventory"), item);
+      await recordInventoryHistory(user.uid, item.itemID, item.quantity);
     }
     form.reset();
     popup.style.display = 'none';
@@ -118,8 +119,14 @@ async function loadInventory(uid) {
     btn.addEventListener('click', async function() {
       const id = this.getAttribute('data-id');
       if (confirm("Are you sure you want to delete this item?")) {
-        await deleteDoc(doc(db, "users", auth.currentUser.uid, "inventory", id));
-        loadInventory(auth.currentUser.uid);
+        const itemRef = doc(db, "users", auth.currentUser.uid, "inventory", id);
+        const itemSnap = await getDoc(itemRef);
+        if (itemSnap.exists()) {
+          const item = itemSnap.data();
+          await deleteDoc(itemRef);
+          loadInventory(auth.currentUser.uid);
+          await recordInventoryHistory(user.uid, item.itemID, 0);
+        }
       }
     });
   });
@@ -211,5 +218,14 @@ async function loadInventory(uid) {
         }
       }
     });
+  });
+}
+
+// --- NEW FUNCTION: Record inventory history ---
+async function recordInventoryHistory(uid, itemID, quantity) {
+  await addDoc(collection(db, "users", uid, "inventoryHistory"), {
+    itemID,
+    quantity: Number(quantity),
+    timestamp: Date.now()
   });
 }
