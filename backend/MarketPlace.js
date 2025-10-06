@@ -22,10 +22,9 @@ async function getInventoryItems(uid) {
 
 // --- ChatGPT API call for seasonal demand ---
 async function getSeasonalDemand(itemName) {
-  // Replace with your backend endpoint that calls OpenAI API
-  const response = await fetch(`/api/chatgpt-seasonal-demand?item=${encodeURIComponent(itemName)}`);
+  const response = await fetch(`http://localhost:3000/api/chatgpt-seasonal-demand?item=${encodeURIComponent(itemName)}`);
   if (!response.ok) return null;
-  return await response.json(); // { demand: true/false, reason: "..." }
+  return await response.json();
 }
 
 async function loadOpenRequests(supplierUid) {
@@ -72,16 +71,14 @@ async function loadOpenRequests(supplierUid) {
       }
 
       // --- ChatGPT Seasonal Demand Tag ---
-      let seasonalTag = "";
-      let seasonalReason = "";
       const seasonal = await getSeasonalDemand(req.itemName);
+      let seasonalTag = "";
       if (seasonal?.demand) {
-        seasonalTag += `<span class="seasonal-tag" title="${seasonal.reason}">Seasonal Demand</span>`;
-        seasonalReason = seasonal.reason;
+        seasonalTag = `<span class="seasonal-tag" title="${seasonal.reason}">${seasonal.recommendation}</span>`;
         await createNotification(supplierUid, {
           type: "seasonal_recommendation",
           title: "Seasonal Demand",
-          body: seasonalReason,
+          body: seasonal.reason,
           related: { globalProcurementId: docSnap.id, itemID: req.itemID }
         });
       }
