@@ -1,9 +1,10 @@
 // Import Firebase modules from your config and Firestore functions from CDN
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, getDoc, query, where, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
+import { generateStandardId } from "./id-utils.js";
 
 // DOM Elements
 const popup = document.getElementById('fluid-popup');
@@ -56,6 +57,7 @@ onAuthStateChanged(auth, async (user) => {
     } else {
       // Add new item
       await addDoc(collection(db, "users", user.uid, "inventory"), item);
+      await recordInventoryHistory(user.uid, item.itemID, item.quantity);
     }
     form.reset();
     popup.style.display = 'none';
@@ -118,8 +120,14 @@ async function loadInventory(uid) {
     btn.addEventListener('click', async function() {
       const id = this.getAttribute('data-id');
       if (confirm("Are you sure you want to delete this item?")) {
-        await deleteDoc(doc(db, "users", auth.currentUser.uid, "inventory", id));
-        loadInventory(auth.currentUser.uid);
+        const itemRef = doc(db, "users", auth.currentUser.uid, "inventory", id);
+        const itemSnap = await getDoc(itemRef);
+        if (itemSnap.exists()) {
+          const item = itemSnap.data();
+          await deleteDoc(itemRef);
+          loadInventory(auth.currentUser.uid);
+          await recordInventoryHistory(user.uid, item.itemID, 0);
+        }
       }
     });
   });
@@ -147,11 +155,11 @@ async function loadInventory(uid) {
 
         // Only automate if automation enabled, presetQty set, and quantity below presetQty
         if (presetMode && presetQty > 0 && quantity < presetQty) {
-          // Check for existing open procurement request
+          // Check for existing open / active procurement request
           const reqQuery = query(
             collection(db, "users", auth.currentUser.uid, "procurementRequests"),
             where("itemID", "==", item.itemID),
-            where("status", "==", "open")
+            where("status", "in", ["open", "pending", "ordered"])
           );
           const reqSnap = await getDocs(reqQuery);
           if (reqSnap.empty) {
@@ -189,27 +197,32 @@ async function loadInventory(uid) {
               fulfilled: false
             };
 
-            // Add to global procurementRequests for suppliers
-            const globalReqRef = await addDoc(collection(db, "globalProcurementRequests"), requestData);
-            await updateDoc(globalReqRef, { globalProcurementId: globalReqRef.id });
+            // Use friendly id instead of Firestore auto-id
+            const newGlobalProcId = generateStandardId("procurement");
+            await setDoc(doc(db, "globalProcurementRequests", newGlobalProcId), { ...requestData, globalProcurementId: newGlobalProcId });
 
-            // Add to user's procurementRequests, store globalProcurementId
-            const userReqRef = await addDoc(
-              collection(db, "users", auth.currentUser.uid, "procurementRequests"),
-              { ...requestData, globalProcurementId: globalReqRef.id }
-            );
-            await updateDoc(userReqRef, { requestId: userReqRef.id });
-            
+            // Create user procurement doc with same id (for traceability) and set requestId
+            await setDoc(doc(db, "users", auth.currentUser.uid, "procurementRequests", newGlobalProcId), { ...requestData, globalProcurementId: newGlobalProcId, requestId: newGlobalProcId });
+
             await createNotification(auth.currentUser.uid, {
               type: "procurement_created",
               title: "Procurement Request Created",
               body: `${requestData.itemName} • Qty ${requestData.requestedQty}`,
-              related: { globalProcurementId: globalReqRef.id, itemID: requestData.itemID }
+              related: { globalProcurementId: newGlobalProcId, itemID: requestData.itemID }
             });
             showToast("Procurement request created", "success");
           }
         }
       }
     });
+  });
+}
+
+// --- NEW FUNCTION: Record inventory history ---
+async function recordInventoryHistory(uid, itemID, quantity) {
+  await addDoc(collection(db, "users", uid, "inventoryHistory"), {
+    itemID,
+    quantity: Number(quantity),
+    timestamp: Date.now()
   });
 }

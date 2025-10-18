@@ -1,22 +1,42 @@
 import { db } from "./firebase-config.js";
 import {
-  collection, getDocs, doc, updateDoc, arrayUnion, getDoc, query, where, addDoc
+  collection, getDocs, doc, updateDoc, arrayUnion, getDoc, query, where, addDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
+import { generateStandardId } from "./id-utils.js";
 
 const auth = getAuth();
 
 let prefill = { name: "", location: "" };
+
+async function getInventoryItems(uid) {
+  const invSnap = await getDocs(collection(db, "users", uid, "inventory"));
+  const items = {};
+  invSnap.forEach(docSnap => {
+    const d = docSnap.data();
+    items[d.itemName?.toLowerCase()] = d.quantity;
+  });
+  return items;
+}
+
+// --- ChatGPT API call for seasonal demand ---
+async function getSeasonalDemand(itemName) {
+  const response = await fetch(`http://localhost:3000/api/chatgpt-seasonal-demand?item=${encodeURIComponent(itemName)}`);
+  if (!response.ok) return null;
+  return await response.json();
+}
 
 async function loadOpenRequests(supplierUid) {
   const marketplaceList = document.querySelector('.marketplace-list');
   if (!marketplaceList) return;
   marketplaceList.innerHTML = "";
 
+  const inventory = await getInventoryItems(supplierUid);
+
   const reqSnap = await getDocs(collection(db, "globalProcurementRequests"));
-  reqSnap.forEach((docSnap) => {
+  reqSnap.forEach(async (docSnap) => {
     const req = docSnap.data();
     if (req.status === "open" && req.userUid !== supplierUid) {
       const dealerName =
@@ -35,10 +55,43 @@ async function loadOpenRequests(supplierUid) {
         req.address
       ].filter(v => v && String(v).trim().length).join(", ") || "N/A";
 
+      // --- AI Recommendation Tag ---
+      let recTag = "";
+      let recReason = "";
+      const invQty = inventory[req.itemName?.toLowerCase()];
+      if (invQty && invQty >= req.requestedQty) {
+        recTag += `<span class="rec-tag" title="You have ${invQty} units in inventory. Recommended to sell.">Recommended to Sell</span>`;
+        recReason = `You have ${invQty} units of ${req.itemName} in inventory. Market demand is high.`;
+        // Send notification (once per request)
+        await createNotification(supplierUid, {
+          type: "recommendation",
+          title: "Sell Recommendation",
+          body: recReason,
+          related: { globalProcurementId: docSnap.id, itemID: req.itemID }
+        });
+      }
+
+      // --- ChatGPT Seasonal Demand Tag ---
+      const seasonal = await getSeasonalDemand(req.itemName);
+      let seasonalTag = "";
+      if (seasonal?.demand) {
+        seasonalTag = `<span class="seasonal-tag" title="${seasonal.reason}">${seasonal.recommendation}</span>`;
+        await createNotification(supplierUid, {
+          type: "seasonal_recommendation",
+          title: "Seasonal Demand",
+          body: seasonal.reason,
+          related: { globalProcurementId: docSnap.id, itemID: req.itemID }
+        });
+      }
+
       marketplaceList.innerHTML += `
         <div class="deal-card">
           <div class="deal-details">
-            <div class="deal-title">${req.itemName}</div>
+            <div class="deal-title">
+              ${req.itemName}
+              ${recTag}
+              ${seasonalTag}
+            </div>
             <div class="deal-meta"><span><b>Requested Qty:</b> ${req.requestedQty}</span></div>
             <div class="deal-meta"><span><b>Requested By:</b> ${dealerName}</span></div>
             <div class="deal-meta"><span><b>Location/Address:</b> ${locAddr}</span></div>
@@ -108,9 +161,10 @@ document.getElementById('offer-form').addEventListener('submit', async function 
     status: "pending"
   };
 
-  // Save under supplier's offers
-  const offerRef = await addDoc(collection(db, "users", supplierUid, "offers"), offerData);
-  offerData.offerId = offerRef.id;
+  // Use friendly offer id instead of Firestore auto-id
+  const offerId = generateStandardId("offer");
+  offerData.offerId = offerId;
+  await setDoc(doc(db, "users", supplierUid, "offers", offerId), offerData);
 
   // Append into global request
   const reqRef = doc(db, "globalProcurementRequests", currentReqId);
