@@ -1,6 +1,6 @@
-# 🚀 Smart Supply Chain System (In Development)
+# 🚀 Block Nex (In Development)
 
-A modern, web-based **Smart Supply Chain Management System** designed to automate inventory tracking, procurement, and supplier-dealer interactions — with planned integration of blockchain for transparency and traceability.
+A modern, web-based **Block Nex (Supply Chain Management System)** designed to automate inventory tracking, procurement, and supplier-dealer interactions — with planned integration of blockchain for transparency and traceability.
 
 > 🎓 **Final Year B.E. Project (2025)**  
 > Developed as part of the Bachelor of Engineering (B.E.) curriculum for academic submission and research.
@@ -48,7 +48,7 @@ A modern, web-based **Smart Supply Chain Management System** designed to automat
 ## 📁 Project Structure
 
 ```
-Smart Supply Chain System/
+Block Nex/
  frontend/
 │   ├── dashboard.html, dashboardstyle.css
 │   ├── inventory.html, inventorystyle.css
@@ -122,7 +122,7 @@ To run locally:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Lithishc/Smart-Supply-Chain-System.git
+   git clone https://github.com/Lithishc/Block-Nex.git
    ```
 2. Open the project folder in [Visual Studio Code](https://code.visualstudio.com/).
 
