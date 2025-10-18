@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Supplier Details</title>
+  <link rel="stylesheet" href="supplier-details.css">
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div class="container">
+    <h2>Supplier Details</h2>
+    <form id="supplier-form">
+      <label>Supplier Name / Company Name
+        <input type="text" name="companyName" required>
+      </label>
+      <label>Contact Person Name
+        <input type="text" name="contactPerson" required>
+      </label>
+      <label>Contact Number
+        <input type="text" name="contactNumber" required>
+      </label>
+      <label>Email Address
+        <input type="email" name="email" required>
+      </label>
+      <label>Company Address
+        <input type="text" name="companyAddress" required>
+      </label>
+      <label>GST / Tax ID Number
+        <input type="text" name="gstNumber" required>
+      </label>
+      <label>Business Registration Number
+        <input type="text" name="registrationNumber" required>
+      </label>
+      <label>Industry Category
+        <input type="text" name="industryCategory" required>
+      </label>
+      <button type="submit" class="pill-btn">Save Details</button>
+    </form>
+    <div id="supplier-info"></div>
+  </div>
+  <script type="module">
+    import { loadNavbar } from '../backend/navbar.js';
+    loadNavbar();
+  </script>
+  <script type="module" src="../backend/supplier-details.js"></script>
+  <script type="module" src="../backend/notifications-listener.js"></script>
+  <script type="module" src="../backend/offers-badge-listener.js"></script>
+</body>
+</html>

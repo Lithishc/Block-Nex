@@ -1,0 +1,289 @@
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Full Page Gradient Background */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #e0e7ff 0%, #f5f7fa 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Container Styling */
+.container {
+    display: flex;
+    max-width: 900px;
+    margin: 40px auto;
+    background: rgba(255,255,255,0.95);
+    border-radius: 32px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.13), 0 1.5px 8px 0 rgba(0,0,0,0.09);
+    overflow: hidden;
+    width: 100%;
+}
+
+/* Left Section - Welcome Text */
+.left-section {
+    flex: 1.2;
+    background: linear-gradient(135deg, #4a90e2 0%, #003366 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 48px 36px;
+}
+
+.left-section h1 {
+    font-size: 2.2rem;
+    margin-bottom: 18px;
+    letter-spacing: 1px;
+}
+
+.left-section p {
+    font-size: 1.1rem;
+    opacity: 0.95;
+}
+
+/* Right Section - Login Form */
+.right-section {
+    flex: 1.5;
+    padding: 48px 36px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center; /* Center content horizontally */
+    background: #fff;
+}
+
+.right-section h2 {
+    margin-bottom: 24px;
+    color: #003366;
+    font-size: 1.6rem;
+    letter-spacing: 1px;
+    text-align: center;
+}
+
+/* Toggle Buttons */
+.toggle-container button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease, color 0.3s ease, transform 0.3s ease;
+    border-radius: 50px;
+}
+
+/* Active Button */
+.toggle-container button.active {
+    background: linear-gradient(135deg, #6a11cb, #2575fc);
+    color: white;
+    box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.2);
+    transform: scale(1.1);
+}
+
+/* Inactive Button */
+.toggle-container button:not(.active) {
+    color: gray;
+    transform: scale(1);
+}
+
+/* Hover Effect */
+.toggle-container button:hover {
+    transform: scale(1.05);
+}
+
+
+/* Login Form */
+#loginForm {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center form fields */
+    gap: 0;
+}
+
+#loginForm input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 30px;
+    background: #eaf6fb;
+    font-size: 14px;
+    outline: none;
+    text-indent: 10px;
+}
+
+#loginForm button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 30px;
+    background: linear-gradient(135deg, #2193b0, #6dd5ed 80%);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+    margin-bottom: 18px;
+}
+
+#loginForm button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Extra Links - Centered and Aligned */
+.extra-links {
+    text-align: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.extra-links a {
+    color: #004080;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+
+.extra-links a:hover {
+    color: #0066cc;
+    text-decoration: underline;
+}
+
+/* Gray Horizontal Line */
+.divider {
+    width: 100%;
+    height: 1.5px;
+    background: #e0e7ef;
+    margin: 18px 0 10px 0;
+    border-radius: 2px;
+}
+
+/* Create New Account Button (Same as Login Button) */
+#createAccount {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    padding: 12px;
+    text-align: center;
+    border-radius: 30px;
+    background: linear-gradient(135deg, #43cea2, #185a9d 80%);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    margin-top: 10px; /* Space after divider */
+    transition: 0.3s;
+}
+#createAccount:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Error Message */
+#errorMessage {
+    color: #c0392b;
+    font-size: 1rem;
+    text-align: center;
+    margin-top: 6px;
+}
+
+#successMessage {
+    color: #27ae60;
+    font-size: 1rem;
+    text-align: center;
+    margin-top: 6px;
+}
+
+/* Style for the registration form fields and button */
+#registerForm {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+#registerForm input[type="text"],
+#registerForm input[type="email"],
+#registerForm input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 30px;
+    background: #eaf6fb;
+    font-size: 14px;
+    outline: none;
+    text-indent: 10px;
+    margin-bottom: 0;
+    box-sizing: border-box;
+    transition: border 0.2s, background 0.2s;
+}
+
+#registerForm input:focus {
+    background: #fff;
+    border: 1.5px solid #4a90e2;
+}
+
+#registerForm button[type="submit"] {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 30px;
+    background: linear-gradient(135deg, #2193b0, #6dd5ed 80%);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+    margin-top: 8px;
+}
+
+#registerForm button[type="submit"]:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Make sure error/success messages are styled and spaced */
+#registerForm #errorMessage,
+#registerForm #successMessage {
+    margin-top: 6px;
+    margin-bottom: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 800px) {
+  .container {
+    flex-direction: column;
+    max-width: 98vw;
+    margin: 16px;
+  }
+  .left-section, .right-section {
+    padding: 32px 16px;
+  }
+  .left-section {
+    align-items: center;
+    text-align: center;
+  }
+}
+
+

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Notifications</title>
+  <link rel="stylesheet" href="notificationsstyle.css">
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div class="container">
+    <h2>Your Notifications</h2>
+    <div class="notifs-list" id="notifs-list"></div>
+  </div>
+  <script type="module">
+    import { loadNavbar } from '../backend/navbar.js';
+    loadNavbar();
+  </script>
+  <script type="module" src="../backend/notifications-page.js"></script>
+  <script type="module" src="../backend/notifications-listener.js"></script>
+    <script type="module" src="../backend/offers-badge-listener.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Ignore everything by default
+*
+
+# Track these files at repo root
+!.gitignore
+!LICENSE
+!README*
+!index.html
+!registry.html
+
+# Track everything under frontend/ and backend/
+!frontend/**
+!backend/**
+
+# Still ignore editor junk
+.vscode/

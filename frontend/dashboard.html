@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Supply Chain</title>
+  <link rel="stylesheet" href="dashboardstyle.css">
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+
+  <div class="content">
+    <h2>Welcome to Smart Supply Chain Platform</h2>
+    <p>Select a tab from the menu to begin.</p>
+  </div>
+
+  <script type="module">
+    import { loadNavbar } from '../backend/navbar.js';
+    loadNavbar();
+  </script>
+  <script type="module" src="../backend/notifications-listener.js"></script>
+  <script type="module" src="../backend/offers-badge-listener.js"></script>
+</body>
+</html>

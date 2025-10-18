@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="profile.css">
+</head>
+<body>
+    <div id="navbar-placeholder"></div>
+ 
+
+  <!-- Profile Content -->
+  <div class="profile-container">
+    <h2>User Profile</h2>
+    <form id="profile-form">
+      <label>Name</label>
+      <input type="text" id="name" disabled>
+
+      <label>Email</label>
+      <input type="email" id="email" disabled>
+
+      <label>Phone Number</label>
+      <input type="text" id="phone" disabled>
+
+      <label>Organization</label>
+      <input type="text" id="organization" disabled>
+
+      <label>Location</label>
+      <input type="text" id="location" disabled>
+
+      <label>Role</label>
+      <select id="role" disabled>
+        <option value="dealer">Dealer</option>
+        <option value="supplier">Supplier</option>
+      </select>
+
+      <div class="button-group">
+        <button type="button" id="edit-btn">Edit</button>
+        <button type="submit" id="save-btn" style="display: none;">Save</button>
+        <button type="button" id="cancel-btn" style="display: none;">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <script type="module" src="../backend/profile.js"></script>
+ <script type="module">
+    import { loadNavbar } from '../backend/navbar.js';
+    loadNavbar();
+  </script>
+  <script type="module" src="../backend/notifications-listener.js"></script>
+  <script type="module" src="../backend/offers-badge-listener.js"></script>
+</html>

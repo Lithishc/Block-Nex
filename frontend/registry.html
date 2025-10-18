@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | Smart Supply Chain System</title>
+    <link rel="stylesheet" href="loginstyle.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Side -->
+        <div class="left-section">
+            <h1>Create Your Account</h1>
+            <p>Join Smart Supply Chain System and optimize your operations.</p>
+        </div>
+
+        <!-- Right Side (Register Form) -->
+        <div class="right-section">
+            <h2>Create Account</h2>
+            <form id="registerForm">
+                <input type="text" id="name" placeholder="Full Name" required>
+                <input type="email" id="email" placeholder="Email Address" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <input type="password" id="confirmPassword" placeholder="Re-enter Password" required>
+                <button type="submit">Create Account</button>
+
+                <!-- Gray Horizontal Line -->
+                <div class="divider"></div>
+
+                <!-- Back to Login Link -->
+                <div class="extra-links">
+                    <a href="../index.html" id="backToLogin">Already have an account? Login</a>
+                </div>
+
+                <p id="errorMessage"></p>
+                <p id="successMessage" style="color:green;"></p>
+            </form>
+        </div>
+    </div>
+
+    <script defer type="module" src="../backend/registerscript.js"></script>
+</body>
+</html>

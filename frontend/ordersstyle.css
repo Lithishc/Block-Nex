@@ -1,0 +1,183 @@
+/* General styles */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: linear-gradient(135deg, #e0e7ff 0%, #f5f7fa 100%);
+  min-height: 100vh;
+}
+
+h1 {
+  text-align: center;
+  font-size: 2.5rem;
+  letter-spacing: 2px;
+  color: #003366;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+.container {
+  padding: 32px 28px;
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  animation: fadeIn 1.2s cubic-bezier(.39,.575,.565,1) both;
+  transition: box-shadow 0.4s, background 0.4s;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: rgba(255,255,255,0.7);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.06);
+  animation: fadeIn 1.2s cubic-bezier(.39,.575,.565,1) both;
+}
+
+th, td {
+  padding: 12px;
+  text-align: center;
+  border: 1px solid #ccc;
+}
+
+th {
+  background-color: rgba(0, 64, 128, 0.85);
+  color: white;
+}
+
+/* Popup overlay */
+#order-tracking-popup {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* Popup content */
+#order-tracking-popup > div {
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
+  padding: 36px 36px 28px 36px;
+  min-width: 340px;
+  max-width: 95vw;
+  width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  animation: fadeIn 0.4s;
+}
+
+/* Pill-shaped close button */
+#order-tracking-popup .close-btn {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  background: #e0e7ff;
+  color: #003366;
+  border: none;
+  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  font-size: 1.3rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #0001;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#order-tracking-popup .close-btn:hover {
+  background: #b3c6ff;
+  color: #001a33;
+}
+
+/* Table inside popup */
+#order-tracking-popup table {
+  width: 100%;
+  border-radius: 12px;
+  background: #f5f7fa;
+  box-shadow: none;
+  margin-bottom: 12px;
+}
+#order-tracking-popup th {
+  background: #1956a3;
+  color: #fff;
+  border-radius: 0px 0px 0 0;
+  font-size: 1rem;
+  padding: 8px;
+}
+#order-tracking-popup td {
+  background: #f5f7fa;
+  border: none;
+  font-size: 0.98rem;
+  padding: 7px 6px;
+}
+
+/* Status cell styles */
+.status-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  padding-right: 16px;
+}
+
+.status-text {
+  flex: 1;
+  text-align: center;
+  font-weight: 500;
+  padding-left: 8px;
+}
+
+#download-contract-btn
+ {
+    border-radius: 999px;
+    padding: 10px 28px;
+    font-size: 1rem;
+    background: #0a4fa9;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    margin-right: 8px;
+    box-shadow: 0 2px 8px #0001;
+    transition: background 0.2s;
+}
+
+/* Pill button styles */
+.pill-btn {
+  background: #1956a3;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 22px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #0001;
+  transition: background 0.2s;
+  margin-left: 12px;
+  margin-right: 0;
+}
+
+.pill-btn:hover {
+  background: #003366;
+  color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  #order-tracking-popup > div {
+    min-width: 0;
+    width: 98vw;
+    padding: 18px 4vw 18px 4vw;
+  }
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: scale(0.95);}
+  100% { opacity: 1; transform: scale(1);}
+}
