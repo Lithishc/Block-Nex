@@ -39,18 +39,34 @@
       <div class="fluid-popup-content">
         <button class="close-btn" onclick="document.getElementById('fluid-popup').style.display='none'">X</button>
         <form id="add-item-form-popup">
-          <input type="text" id="item-ID" placeholder="Item ID" required>
-          <input type="text" id="item-name" placeholder="Item Name" required>
-          <input type="text" id="item-desc" placeholder="Description" required>
-          <input type="text" id="item-category" placeholder="Category" required>
-          <input type="number" id="item-qty" placeholder="Quantity" required>
-          <input type="text" id="item-price" placeholder="Price" required>
-          <input type="text" id="item-supplier" placeholder="Supplier" required>
-          <input type="text" id="item-location" placeholder="Location" required>
-          <button type="submit" class="add-btn" style="margin-top:10px;">Add Item</button>
-        </form>
+            <label for="item-ID">Item ID</label>
+            <input type="text" id="item-ID" placeholder="e.g. 12345" required>
+
+            <label for="item-name">Item Name</label>
+            <input type="text" id="item-name" placeholder="e.g. Apple" required>
+
+            <label for="item-desc">Description</label>
+            <input type="text" id="item-desc" placeholder="Short description" required>
+
+            <label for="item-category">Category</label>
+            <input type="text" id="item-category" placeholder="e.g. Grocery" required>
+
+            <label for="item-qty">Quantity</label>
+            <input type="number" id="item-qty" placeholder="e.g. 1000" required>
+
+            <label for="item-price">Price</label>
+            <input type="text" id="item-price" placeholder="e.g. 50" required>
+
+            <label for="item-supplier">Supplier</label>
+            <input type="text" id="item-supplier" placeholder="Supplier name" required>
+
+            <label for="item-location">Location</label>
+            <input type="text" id="item-location" placeholder="City / Address" required>
+
+            <button type="submit" class="add-btn" style="margin-top:10px;">Add Item</button>
+          </form>
+        </div>
       </div>
-    </div>
 
     <script type="module" src="../backend/inventory.js"></script>
     <script>

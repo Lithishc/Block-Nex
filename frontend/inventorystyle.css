@@ -228,7 +228,7 @@ th {
   background: #fff;
   border-radius: 24px;
   box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
-  padding: 32px 28px 24px 28px;
+  padding: 32px 28px 24px 32px;
   min-width: 340px;
   max-width: 95vw;
   max-height: 80vh;
@@ -466,4 +466,61 @@ th {
     max-width: 98%;
     padding: 18px 6px;
   }
+}
+
+/* Labels inside popup form */
+
+
+/* tighter, wider popup form (override previous roomy styles) */
+.fluid-popup-content {
+  /* increase width so inputs feel less cramped */
+  min-width: 520px;
+  max-width: 680px;
+  padding: 22px 22px 18px 22px;
+}
+
+/* make the popup form single-column and reduce vertical spacing */
+.fluid-popup-content form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+/* labels: reduce margin and weight so they don't create big gaps */
+.fluid-popup-content form label {
+  display: block;
+  font-weight: 600;
+  color: #23405e;
+  margin: 6px 4px 4px 4px;
+  font-size: 0.95rem;
+}
+
+/* inputs: keep previous look but reduce whitespace and increase width */
+.fluid-popup-content form input {
+  width: 100%;
+  margin: 0 0 6px 0;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: #e0e7ff;
+  font-size: 14px;
+}
+
+/* submit button: keep pill style and full-width but slightly smaller */
+.fluid-popup-content form .add-btn {
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 8px;
+}
+
+/* ensure popup scrollbars don't add extra spacing on narrow screens */
+@media (max-width: 640px) {
+  .fluid-popup-content {
+    min-width: 320px;
+    max-width: 92vw;
+    padding: 18px;
+  }
+  .fluid-popup-content form label { margin: 6px 2px 4px 2px; }
+  .fluid-popup-content form input { padding: 9px 10px; }
 }
