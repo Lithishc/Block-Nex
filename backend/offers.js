@@ -201,7 +201,14 @@ window.UpdateTracking = async (uid, globalOrderId) => {
 
   // Only allow supplier to update status after both have signed
   let statusSection = "";
-  if (dealerSigned && supplierSigned) {
+  // Hide update controls when order is in a final state (delivered/fulfilled)
+  const statusLower = (order.status || "").toString().toLowerCase();
+  const isFinalStatus = statusLower === "delivered" || statusLower === "fulfilled";
+
+  if (isFinalStatus) {
+    // Completely hide update UI to avoid confusion
+    statusSection = "";
+  } else if (dealerSigned && supplierSigned) {
     statusSection = `<div style="margin-bottom:16px;">
         <label for="status-select">Update Status:</label>
         <select id="status-select" ${availableStatuses.length === 0 ? "disabled" : ""}>
