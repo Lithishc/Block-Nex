@@ -76,15 +76,21 @@ table {
   border-collapse: collapse;
   background-color: rgba(255,255,255,0.7);
   border-radius: 18px;
-  overflow: hidden;
+  /* allow dropdowns / popups inside table cells to escape rounded container */
+  overflow: visible;
+  /* keep stacking order predictable so menu can float above */
+  position: relative;
+  z-index: 1;
   box-shadow: 0 2px 16px 0 rgba(0,0,0,0.06);
   animation: fadeIn 1.2s cubic-bezier(.39,.575,.565,1) both;
 }
 
+/* ensure individual cells don't clip the menu */
 th, td {
   padding: 12px;
   text-align: center;
   border: 1px solid #ccc;
+  overflow: visible;
 }
 
 th {
@@ -346,6 +352,109 @@ th {
 
 .pill-btn:hover {
   background: #003366;
+}
+
+/* --- Actions three-dot menu (UI only) --- */
+.actions-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* MAKE THREE‑DOT BUTTON MORE BOLD & VISIBLE */
+.more-btn {
+  background: #1956a3;       /* filled blue */
+  color: #fff;               /* white dots */
+  border: none;
+  width: 44px;               /* larger hit area */
+  height: 44px;
+  border-radius: 999px;      /* circular */
+  font-size: 20px;           /* larger dot glyph */
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(25,86,163,0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  padding: 0;
+}
+/* subtle lift on hover */
+.more-btn:hover {
+  transform: translateY(-3px);
+  background: #0e3a7d;
+  box-shadow: 0 10px 26px rgba(25,86,163,0.22);
+}
+
+/* Ensure the glyph looks like three dots and centered */
+.more-btn::before {
+  content: "⋮";
+  font-weight: 700;
+}
+
+/* ACTION MENU: make edit/delete match Add button style (pill) */
+.action-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(6,24,44,0.12);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 140px;
+  z-index: 50;
+  transform-origin: top right;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px) scale(0.98);
+  transition: opacity 140ms ease, transform 140ms ease;
+  border: 1px solid #eef2fa;
+}
+
+/* show */
+.actions-wrapper.open .action-menu,
+.action-menu[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+/* pill style like Add button */
+.action-menu .edit-btn,
+.action-menu .delete-btn {
+  background: rgba(0, 64, 128, 0.85); /* same blue as add-btn */
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 999px;    /* pill */
+  cursor: pointer;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0,64,128,0.14);
+  transition: background 120ms ease, transform 80ms ease;
+}
+
+/* delete uses red but same pill shape */
+.action-menu .delete-btn {
+  background: #e74c3c;
+  box-shadow: 0 6px 18px rgba(231,76,60,0.14);
+}
+
+.action-menu .edit-btn:hover { background: #0e3a7d; transform: translateY(-2px); }
+.action-menu .delete-btn:hover { background: #c0392b; transform: translateY(-2px); }
+
+/* make sure menu doesn't overflow visually on narrow table cells */
+#inventory-table td { position: relative; overflow: visible; }
+
+/* keep layout tidy on small screens */
+@media (max-width: 700px) {
+  .actions-wrapper { width: 42px; height: 42px; }
+  .more-btn { width: 32px; height: 32px; font-size: 16px; }
+  .action-menu { min-width: 100px; right: -6px; }
 }
 
 @media (max-width: 900px) {

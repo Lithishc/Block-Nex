@@ -86,9 +86,14 @@ async function loadInventory(uid) {
       <td>${item.supplier}</td>
       <td>${item.location}</td>
       <td>
-        <button class="edit-btn" data-id="${docSnap.id}">Edit</button>
-        <button class="delete-btn" data-id="${docSnap.id}">Delete</button>
-      </td>
+        <div class="actions-wrapper">
+          <button class="more-btn" aria-label="More options" data-id="${docSnap.id}"></button>
+           <div class="action-menu" role="menu" aria-hidden="true">
+             <button class="edit-btn" data-id="${docSnap.id}">Edit</button>
+             <button class="delete-btn" data-id="${docSnap.id}">Delete</button>
+           </div>
+         </div>
+       </td>
     `;
     tableBody.appendChild(row);
   });
@@ -129,6 +134,40 @@ async function loadInventory(uid) {
           await recordInventoryHistory(user.uid, item.itemID, 0);
         }
       }
+    });
+  });
+
+  // --- NEW: three-dot menu toggle (shows Edit / Delete) ---
+  // Toggle menu when more-btn clicked; clicking outside closes menus.
+  document.querySelectorAll('.more-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wrapper = btn.closest('.actions-wrapper');
+      const menu = wrapper.querySelector('.action-menu');
+      const isOpen = wrapper.classList.contains('open');
+      // close other menus
+      document.querySelectorAll('.actions-wrapper.open').forEach(w => {
+        if (w !== wrapper) {
+          w.classList.remove('open');
+          w.querySelector('.action-menu').setAttribute('aria-hidden', 'true');
+        }
+      });
+      if (isOpen) {
+        wrapper.classList.remove('open');
+        menu.setAttribute('aria-hidden', 'true');
+      } else {
+        wrapper.classList.add('open');
+        menu.setAttribute('aria-hidden', 'false');
+      }
+    });
+  });
+
+  // Close menus when clicking anywhere else
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.actions-wrapper.open').forEach(w => {
+      w.classList.remove('open');
+      const m = w.querySelector('.action-menu');
+      if (m) m.setAttribute('aria-hidden', 'true');
     });
   });
 
