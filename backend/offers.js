@@ -182,7 +182,7 @@ window.UpdateTracking = async (uid, globalOrderId) => {
   }
 
   contractSection = `
-    <div style="margin:16px 0;padding:12px;border:1px solid #aaa;background:#f9f9f9;">
+    <div style="margin:16px 0;padding:12px;border:1px solid #aaa;background:#f9f9f9; border-radius: 20px;">
       <h3>Digital Contract</h3>
       <pre style="white-space:pre-wrap;font-size:0.95em;">${contractText}</pre>
       <div style="margin:8px 0;">
