@@ -264,27 +264,6 @@ th {
 
 .fluid-popup-content { position: relative; } /* ensure positioned ancestor */
 
-.close-btn {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  color: #6b7280;
-  font-size: 22px;
-  line-height: 36px;
-  text-align: center;
-  cursor: pointer;
-  transition: background .15s ease, color .15s ease, transform .08s ease;
-}
-.close-btn:hover {
-  background: #eef2ff;
-  color: #1956a3;
-  transform: scale(1.06);
-}
 
 /* --- Editable input styles in table --- */
 .editable-input {

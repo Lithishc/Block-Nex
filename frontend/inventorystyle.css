@@ -244,18 +244,6 @@ th {
 
 .close-btn {
   position: absolute;
-  top: 14px;
-  right: 18px;
-  background: #eee;
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-.close-btn {
-  position: absolute;
   top: 18px;
   right: 22px;
   background: #e0e7ff;

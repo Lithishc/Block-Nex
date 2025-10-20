@@ -22,10 +22,17 @@ async function getInventoryItems(uid) {
 }
 
 // --- ChatGPT API call for seasonal demand ---
+// Return null on any failure instead of letting errors bubble up.
 async function getSeasonalDemand(itemName) {
-  const response = await fetch(`http://localhost:3000/api/chatgpt-seasonal-demand?item=${encodeURIComponent(itemName)}`);
-  if (!response.ok) return null;
-  return await response.json();
+  try {
+    const response = await fetch(`http://localhost:3000/api/chatgpt-seasonal-demand?item=${encodeURIComponent(itemName)}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (err) {
+    // service offline or network error -> return null so UI remains functional
+    console.warn("Seasonal demand fetch failed:", err);
+    return null;
+  }
 }
 
 async function loadOpenRequests(supplierUid) {
@@ -36,7 +43,10 @@ async function loadOpenRequests(supplierUid) {
   const inventory = await getInventoryItems(supplierUid);
 
   const reqSnap = await getDocs(collection(db, "globalProcurementRequests"));
-  reqSnap.forEach(async (docSnap) => {
+
+  // Render requests immediately (no await on ChatGPT). Then asynchronously
+  // enrich cards with seasonal tag if API is available.
+  for (const docSnap of reqSnap.docs) {
     const req = docSnap.data();
     if (req.status === "open" && req.userUid !== supplierUid) {
       const dealerName =
@@ -55,12 +65,12 @@ async function loadOpenRequests(supplierUid) {
         req.address
       ].filter(v => v && String(v).trim().length).join(", ") || "N/A";
 
-      // --- AI Recommendation Tag ---
-      let recTag = "";
+      // Recommendation tag (computed from supplier inventory) — add immediately
+      let recTagHtml = "";
       let recReason = "";
       const invQty = inventory[req.itemName?.toLowerCase()];
       if (invQty && invQty >= req.requestedQty) {
-        recTag += `<span class="rec-tag" title="You have ${invQty} units in inventory. Recommended to sell.">Recommended to Sell</span>`;
+        recTagHtml = `<span class="rec-tag" title="You have ${invQty} units in inventory. Recommended to sell.">Recommended to Sell</span>`;
         recReason = `You have ${invQty} units of ${req.itemName} in inventory. Market demand is high.`;
         // Send notification (once per request)
         await createNotification(supplierUid, {
@@ -71,36 +81,49 @@ async function loadOpenRequests(supplierUid) {
         });
       }
 
-      // --- ChatGPT Seasonal Demand Tag ---
-      const seasonal = await getSeasonalDemand(req.itemName);
-      let seasonalTag = "";
-      if (seasonal?.demand) {
-        seasonalTag = `<span class="seasonal-tag" title="${seasonal.reason}">${seasonal.recommendation}</span>`;
-        await createNotification(supplierUid, {
-          type: "seasonal_recommendation",
-          title: "Seasonal Demand",
-          body: seasonal.reason,
-          related: { globalProcurementId: docSnap.id, itemID: req.itemID }
-        });
-      }
-
-      marketplaceList.innerHTML += `
-        <div class="deal-card">
-          <div class="deal-details">
-            <div class="deal-title">
-              ${req.itemName}
-              ${recTag}
-              ${seasonalTag}
-            </div>
-            <div class="deal-meta"><span><b>Requested Qty:</b> ${req.requestedQty}</span></div>
-            <div class="deal-meta"><span><b>Requested By:</b> ${dealerName}</span></div>
-            <div class="deal-meta"><span><b>Location/Address:</b> ${locAddr}</span></div>
+      // Build card DOM and append immediately
+      const card = document.createElement('div');
+      card.className = 'deal-card';
+      card.dataset.reqId = docSnap.id;
+      card.innerHTML = `
+        <div class="deal-details">
+          <div class="deal-title">
+            ${req.itemName}
+            ${recTagHtml}
+            <span class="seasonal-placeholder"></span>
           </div>
-          <button class="pill-btn" onclick="window.showOfferPopup('${docSnap.id}')">Send Offer</button>
+          <div class="deal-meta"><span><b>Requested Qty:</b> ${req.requestedQty}</span></div>
+          <div class="deal-meta"><span><b>Requested By:</b> ${dealerName}</span></div>
+          <div class="deal-meta"><span><b>Location/Address:</b> ${locAddr}</span></div>
         </div>
+        <button class="pill-btn" onclick="window.showOfferPopup('${docSnap.id}')">Send Offer</button>
       `;
+      marketplaceList.appendChild(card);
+
+      // Asynchronously try to fetch seasonal tag. If available, update the card in-place.
+      (async () => {
+        const seasonal = await getSeasonalDemand(req.itemName);
+        if (seasonal?.demand) {
+          const seasonalTagHtml = `<span class="seasonal-tag" title="${seasonal.reason}">${seasonal.recommendation}</span>`;
+          // find the inserted card and append the tag
+          const insertedCard = marketplaceList.querySelector(`.deal-card[data-req-id="${docSnap.id}"]`);
+          if (insertedCard) {
+            const placeholder = insertedCard.querySelector('.seasonal-placeholder');
+            if (placeholder) placeholder.outerHTML = seasonalTagHtml;
+          }
+          // send notification about seasonal recommendation
+          await createNotification(supplierUid, {
+            type: "seasonal_recommendation",
+            title: "Seasonal Demand",
+            body: seasonal.reason,
+            related: { globalProcurementId: docSnap.id, itemID: req.itemID }
+          });
+        }
+      })().catch(err => {
+        // ignore; we already warned inside getSeasonalDemand
+      });
     }
-  });
+  }
 }
 
 let currentReqId = null;
