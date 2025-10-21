@@ -295,12 +295,16 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
     const downloadBtn = document.getElementById('download-contract-btn');
     if (signBtn) {
       signBtn.onclick = async () => {
-        let signature = "";
+        // --- NEW: True Digital Signature ---
+        let privateKeyJwk = JSON.parse(localStorage.getItem("privateKeyJwk"));
+        if (!privateKeyJwk) {
+          alert("Private key not found. Please import or generate your key pair.");
+          return;
+        }
+        let signature = await signContractText(contractText, privateKeyJwk);
         if (isDealer) {
-          signature = dealerGSTIN + "-signed-" + new Date().toISOString();
           await saveContractSignature(globalOrderId, 'dealer', signature);
         } else if (isSupplier) {
-          signature = supplierGSTIN + "-signed-" + new Date().toISOString();
           await saveContractSignature(globalOrderId, 'supplier', signature);
         }
         alert('Contract signed successfully!');
@@ -317,16 +321,59 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
   }, 100);
 };
 
-// Utility: Sync all user orders with the latest global order data
-async function syncOrdersWithGlobal(globalOrderId) {
-  // Get the latest global order data
-  const globalOrderRef = doc(db, "globalOrders", globalOrderId);
-  const globalOrderSnap = await getDoc(globalOrderRef);
-  if (!globalOrderSnap.exists()) return;
-  const globalOrder = globalOrderSnap.data();
+// --- Digital Signature Helpers (Web Crypto API) ---
+async function importPublicKey(jwk) {
+  return await window.crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    true,
+    ["verify"]
+  );
+}
+async function importPrivateKey(jwk) {
+  return await window.crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    true,
+    ["sign"]
+  );
+}
+async function signContractText(contractText, privateKeyJwk) {
+  const privateKey = await importPrivateKey(privateKeyJwk);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(contractText);
+  const signature = await window.crypto.subtle.sign(
+    { name: "RSASSA-PKCS1-v1_5" },
+    privateKey,
+    data
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+async function verifyContractSignature(contractText, signatureBase64, publicKeyJwk) {
+  const publicKey = await importPublicKey(publicKeyJwk);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(contractText);
+  const signature = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
+  return await window.crypto.subtle.verify(
+    { name: "RSASSA-PKCS1-v1_5" },
+    publicKey,
+    signature,
+    data
+  );
+}
 
-  // Find all user orders referencing this globalOrderId (dealer and supplier)
-  const ordersQuery = query(
+// Generate a new key pair and store them
+async function generateAndStoreKeyPair() {
+  const keyPair = await window.crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256"
+    },
+    true,
     collectionGroup(db, "orders"),
     where("globalOrderId", "==", globalOrderId)
   );
@@ -351,3 +398,29 @@ async function syncOrdersWithGlobal(globalOrderId) {
     });
   }
 }
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    let privateKeyJwk = localStorage.getItem("privateKeyJwk");
+    let publicKeyJwk = localStorage.getItem("publicKeyJwk");
+    if (!privateKeyJwk || !publicKeyJwk) {
+      // Generate new key pair
+      const keyPair = await window.crypto.subtle.generateKey(
+        {
+          name: "RSASSA-PKCS1-v1_5",
+          modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: "SHA-256"
+        },
+        true,
+        ["sign", "verify"]
+      );
+      const privateJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+      const publicJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
+      localStorage.setItem("privateKeyJwk", JSON.stringify(privateJwk));
+      localStorage.setItem("publicKeyJwk", JSON.stringify(publicJwk));
+      // Upload public key to Firestore under user's info
+      await updateDoc(doc(db, "info", user.uid), { publicKeyJwk: publicJwk });
+    }
+  }
+});

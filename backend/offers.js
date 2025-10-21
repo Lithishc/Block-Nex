@@ -13,9 +13,11 @@ async function getSupplierGSTIN(supplierUid) {
   }
   return "";
 }
+
 function generateContractText(order, dealerGSTIN, supplierGSTIN) {
   return `Digital Supply Contract\n\nOrder ID: ${order.globalOrderId || "-"}\nItem: ${order.itemName}\nQuantity: ${order.quantity}\nSupplier: ${order.supplier}\nSupplier GSTIN: ${supplierGSTIN}\nDealer GSTIN: ${dealerGSTIN}\nPrice: ₹${order.price}\nDetails: ${order.details}\nDate: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}\n\nBy signing, both parties agree to the above terms.`;
 }
+
 async function saveContractSignature(globalOrderId, who, signature) {
   // Update in globalOrders
   const globalOrderRef = doc(db, "globalOrders", globalOrderId);
@@ -34,6 +36,49 @@ async function saveContractSignature(globalOrderId, who, signature) {
     await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
   }
 }
+// --- Digital Signature Helpers (Web Crypto API) ---
+async function importPublicKey(jwk) {
+  return await window.crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    true,
+    ["verify"]
+  );
+}
+async function importPrivateKey(jwk) {
+  return await window.crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    true,
+    ["sign"]
+  );
+}
+async function signContractText(contractText, privateKeyJwk) {
+  const privateKey = await importPrivateKey(privateKeyJwk);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(contractText);
+  const signature = await window.crypto.subtle.sign(
+    { name: "RSASSA-PKCS1-v1_5" },
+    privateKey,
+    data
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+async function verifyContractSignature(contractText, signatureBase64, publicKeyJwk) {
+  const publicKey = await importPublicKey(publicKeyJwk);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(contractText);
+  const signature = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
+  return await window.crypto.subtle.verify(
+    { name: "RSASSA-PKCS1-v1_5" },
+    publicKey,
+    signature,
+    data
+  );
+}
+
 function downloadCertificate(filename, text) {
   const blob = new Blob([text], { type: 'text/plain' });
   const link = document.createElement('a');
@@ -62,6 +107,7 @@ async function loadOffers(uid) {
     tableBody.innerHTML = `<tr><td colspan="7">No offers made yet.</td></tr>`;
     return;
   }
+
   for (const docSnap of offersSnap.docs) {
     const offer = docSnap.data();
     const offerId = docSnap.id;
@@ -190,7 +236,7 @@ window.UpdateTracking = async (uid, globalOrderId) => {
         <b>Supplier Signed:</b> ${supplierSigned ? "✅" : "❌"}
       </div>
       <div style="margin:8px 0 0 0;">
-        ${canSign ? `<button id="sign-contract-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
+        ${canSign ? `<button id="sign-contract-btn" class="pill-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
         ${canDownload ? `<button id="download-contract-btn">Download Certificate</button>` : ""}
       </div>
       <div style="color:#e0103a;font-size:0.95em;margin-top:6px;">
@@ -262,12 +308,16 @@ window.UpdateTracking = async (uid, globalOrderId) => {
     const statusSelect = document.getElementById('status-select');
     if (signBtn) {
       signBtn.onclick = async () => {
-        let signature = "";
+        // --- True Digital Signature ---
+        let privateKeyJwk = JSON.parse(localStorage.getItem("privateKeyJwk"));
+        if (!privateKeyJwk) {
+          alert("Private key not found. Please import or generate your key pair.");
+          return;
+        }
+        let signature = await signContractText(contractText, privateKeyJwk);
         if (isDealer) {
-          signature = dealerGSTIN + "-signed-" + new Date().toISOString();
           await saveContractSignature(globalOrderId, 'dealer', signature);
         } else if (isSupplier) {
-          signature = supplierGSTIN + "-signed-" + new Date().toISOString();
           await saveContractSignature(globalOrderId, 'supplier', signature);
         }
         alert('Contract signed successfully!');
