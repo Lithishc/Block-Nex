@@ -317,8 +317,26 @@ window.UpdateTracking = async (uid, globalOrderId) => {
         let signature = await signContractText(contractText, privateKeyJwk);
         if (isDealer) {
           await saveContractSignature(globalOrderId, 'dealer', signature);
+          // Notify supplier to sign
+          if (order.supplierUid) {
+            await createNotification(order.supplierUid, {
+              type: "contract_sign",
+              title: "Dealer Signed Contract",
+              body: "Dealer has signed the contract. Please review and sign.",
+              related: { globalOrderId }
+            });
+          }
         } else if (isSupplier) {
           await saveContractSignature(globalOrderId, 'supplier', signature);
+          // Notify dealer that supplier signed
+          if (order.dealerUid) {
+            await createNotification(order.dealerUid, {
+              type: "contract_sign",
+              title: "Supplier Signed Contract",
+              body: "Supplier has signed the contract.",
+              related: { globalOrderId }
+            });
+          }
         }
         alert('Contract signed successfully!');
         document.getElementById('order-tracking-popup').remove();
@@ -329,10 +347,10 @@ window.UpdateTracking = async (uid, globalOrderId) => {
       downloadBtn.onclick = () => {
         let certText = contractText + `\n\nDealer Signature: ${contractSignatures.dealer || "-"}\nSupplier Signature: ${contractSignatures.supplier || "-"}`;
         downloadCertificate(`Order_${globalOrderId}_Certificate.txt`, certText);
-      };
-    }
-    if (updateStatusBtn && statusSelect) {
-      updateStatusBtn.onclick = async () => {
+            };
+          }
+          if (updateStatusBtn && statusSelect) {
+            updateStatusBtn.onclick = async () => {
         const newStatus = statusSelect.value;
         if (!newStatus) return;
         // Update status in globalOrders
@@ -350,13 +368,30 @@ window.UpdateTracking = async (uid, globalOrderId) => {
           const trackingArr = orderData.tracking || [];
           trackingArr.push(trackingUpdate);
           await updateDoc(globalOrderRef, { tracking: trackingArr });
+          // --- Notify both dealer and supplier ---
+          if (orderData.dealerUid) {
+            await createNotification(orderData.dealerUid, {
+              type: "order_status",
+              title: "Order Status Updated",
+              body: `Order status changed to "${newStatus}".`,
+              related: { globalOrderId }
+            });
+          }
+          if (orderData.supplierUid) {
+            await createNotification(orderData.supplierUid, {
+              type: "order_status",
+              title: "Order Status Updated",
+              body: `Order status changed to "${newStatus}".`,
+              related: { globalOrderId }
+            });
+          }
         }
         showToast('Order status updated!');
         document.getElementById('order-tracking-popup').remove();
         window.UpdateTracking(uid, globalOrderId); // Refresh popup
-      };
-    }
-  }, 100);
+            };
+          }
+        }, 100);
 
   // Status update logic remains unchanged (as in your current code)
 };

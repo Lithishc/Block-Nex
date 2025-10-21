@@ -1,6 +1,7 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { collection, getDocs, doc, updateDoc, getDoc, query, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { createNotification } from "./notifications-helper.js";
 
 // Digital contract helpers
 async function getSupplierGSTIN(supplierUid) {
@@ -171,7 +172,7 @@ window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId
     await updateDoc(doc(db, "users", uid, "orders", orderDoc.id), { status: "fulfilled", fulfilledAt: new Date() });
   }
 
-  showToast("Procurement marked completed and inventory updated", "success");
+  createNotification("Procurement marked completed and inventory updated", "success");
   loadOrders(uid);
 };
 
@@ -304,12 +305,27 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
         let signature = await signContractText(contractText, privateKeyJwk);
         if (isDealer) {
           await saveContractSignature(globalOrderId, 'dealer', signature);
+          // Notify supplier to sign
+          if (order.supplierUid) {
+            await createNotification(order.supplierUid, {
+              type: "contract_sign",
+              title: "Dealer Signed Contract",
+              body: "Dealer has signed the contract. Please review and sign.",
+              related: { globalOrderId }
+            });
+          }
         } else if (isSupplier) {
           await saveContractSignature(globalOrderId, 'supplier', signature);
+          // Notify dealer that supplier signed
+          if (order.dealerUid) {
+            await createNotification(order.dealerUid, {
+              type: "contract_sign",
+              title: "Supplier Signed Contract",
+              body: "Supplier has signed the contract.",
+              related: { globalOrderId }
+            });
+          }
         }
-        alert('Contract signed successfully!');
-        document.getElementById('order-tracking-popup').remove();
-        window.showTracking(uid, globalOrderId, globalProcurementId); // Refresh popup
       };
     }
     if (downloadBtn) {
@@ -413,7 +429,6 @@ onAuthStateChanged(auth, async (user) => {
           hash: "SHA-256"
         },
         true,
-        ["sign", "verify"]
       );
       const privateJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
       const publicJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
