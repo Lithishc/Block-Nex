@@ -1,5 +1,7 @@
 # Ignore everything by default
 *
+.env
+functions/.env
 
 # Track these files at repo root
 !.gitignore
