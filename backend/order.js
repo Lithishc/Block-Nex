@@ -231,7 +231,7 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
         <b>Supplier Signed:</b> ${supplierSigned ? "✅" : "❌"}
       </div>
       <div style="margin:8px 0 0 0;">
-        ${canSign ? `<button id="sign-contract-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
+        ${canSign ? `<button id="sign-contract-btn" class="pill-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
         ${canDownload ? `<button id="download-contract-btn">Download Certificate</button>` : ""}
       </div>
       <div style="color:#e0103a;font-size:0.95em;margin-top:6px;">

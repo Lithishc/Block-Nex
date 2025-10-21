@@ -64,6 +64,23 @@
   justify-content: center;
   z-index: 9999;
 }
+.pill-btn {
+  background: #1956a3;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 32px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 8px;
+  box-shadow: 0 2px 8px #0001;
+  transition: background 0.2s;
+}
+
+.pill-btn:hover {
+  background: #003366;
+}
 
 /* Popup content */
 #order-tracking-popup > div {
