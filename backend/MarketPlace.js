@@ -35,17 +35,26 @@ async function getSeasonalDemand(itemName) {
   }
 }
 
+async function getMarketDemand(itemName) {
+  // New API call for real-world demand (can use same endpoint with a different prompt)
+  try {
+    const response = await fetch(`http://localhost:3000/api/chatgpt-seasonal-demand?item=${encodeURIComponent(itemName)}&type=market`, { cache: "no-store" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (err) {
+    console.warn("Market demand fetch failed:", err);
+    return null;
+  }
+}
+
 async function loadOpenRequests(supplierUid) {
   const marketplaceList = document.querySelector('.marketplace-list');
   if (!marketplaceList) return;
   marketplaceList.innerHTML = "";
 
   const inventory = await getInventoryItems(supplierUid);
-
   const reqSnap = await getDocs(collection(db, "globalProcurementRequests"));
 
-  // Render requests immediately (no await on ChatGPT). Then asynchronously
-  // enrich cards with seasonal tag if API is available.
   for (const docSnap of reqSnap.docs) {
     const req = docSnap.data();
     if (req.status === "open" && req.userUid !== supplierUid) {
@@ -89,8 +98,8 @@ async function loadOpenRequests(supplierUid) {
         <div class="deal-details">
           <div class="deal-title">
             ${req.itemName}
-            ${recTagHtml}
             <span class="seasonal-placeholder"></span>
+            <span class="recommend-placeholder"></span>
           </div>
           <div class="deal-meta"><span><b>Requested Qty:</b> ${req.requestedQty}</span></div>
           <div class="deal-meta"><span><b>Requested By:</b> ${dealerName}</span></div>
@@ -100,28 +109,31 @@ async function loadOpenRequests(supplierUid) {
       `;
       marketplaceList.appendChild(card);
 
-      // Asynchronously try to fetch seasonal tag. If available, update the card in-place.
+      // Seasonal tag (existing)
       (async () => {
         const seasonal = await getSeasonalDemand(req.itemName);
         if (seasonal?.demand) {
           const seasonalTagHtml = `<span class="seasonal-tag" title="${seasonal.reason}">${seasonal.recommendation}</span>`;
-          // find the inserted card and append the tag
           const insertedCard = marketplaceList.querySelector(`.deal-card[data-req-id="${docSnap.id}"]`);
           if (insertedCard) {
             const placeholder = insertedCard.querySelector('.seasonal-placeholder');
             if (placeholder) placeholder.outerHTML = seasonalTagHtml;
           }
-          // send notification about seasonal recommendation
-          await createNotification(supplierUid, {
-            type: "seasonal_recommendation",
-            title: "Seasonal Demand",
-            body: seasonal.reason,
-            related: { globalProcurementId: docSnap.id, itemID: req.itemID }
-          });
         }
-      })().catch(err => {
-        // ignore; we already warned inside getSeasonalDemand
-      });
+      })();
+
+      // Recommended tag (new, for market demand)
+      (async () => {
+        const market = await getMarketDemand(req.itemName);
+        if (market?.demand) {
+          const recommendTagHtml = `<span class="rec-tag" title="${market.reason}">Recommended</span>`;
+          const insertedCard = marketplaceList.querySelector(`.deal-card[data-req-id="${docSnap.id}"]`);
+          if (insertedCard) {
+            const placeholder = insertedCard.querySelector('.recommend-placeholder');
+            if (placeholder) placeholder.outerHTML = recommendTagHtml;
+          }
+        }
+      })();
     }
   }
 }
@@ -225,6 +237,24 @@ document.getElementById('offer-form').addEventListener('submit', async function 
   window.closeOfferPopup();
   loadOpenRequests(supplierUid);
 });
+
+document.getElementById('show-demand-btn').onclick = async function() {
+  const resultDiv = document.getElementById('demand-results');
+  resultDiv.innerHTML = "<b>Loading...</b>";
+  try {
+    const response = await fetch("http://localhost:3000/api/chatgpt-seasonal-demand?item=all&type=list");
+    const data = await response.json();
+    if (data.items && Array.isArray(data.items)) {
+      resultDiv.innerHTML = "<b>Current High-Demand Items:</b><ul>" +
+        data.items.map(i => `<li><b>${i.name}</b>: ${i.reason}</li>`).join("") +
+        "</ul>";
+    } else {
+      resultDiv.innerHTML = "<b>No data from AI model.</b>";
+    }
+  } catch (err) {
+    resultDiv.innerHTML = "<b>AI API not available.</b>";
+  }
+};
 
 // Wait for authentication, prefetch supplier details for prefill, then load requests
 onAuthStateChanged(auth, async (user) => {

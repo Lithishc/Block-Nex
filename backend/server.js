@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import chatgptSeasonalRouter from "./chatgpt-seasonal-demand.js";
+import 'dotenv/config'; // loads .env automatically
 
 const app = express();
 app.use(cors());
