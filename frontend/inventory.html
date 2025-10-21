@@ -37,42 +37,42 @@
     <!-- Water Fluid Add Popup (hidden by default) -->
     <div id="fluid-popup" class="fluid-popup-bg" style="display:none;">
       <div class="fluid-popup-content">
-        <button class="close-btn" onclick="document.getElementById('fluid-popup').style.display='none'">X</button>
-        <form id="add-item-form-popup">
-            <label for="item-ID">Item ID</label>
-            <input type="text" id="item-ID" placeholder="e.g. 12345" required>
+      <button class="close-btn" onclick="document.getElementById('fluid-popup').style.display='none'">X</button>
+      <form id="add-item-form-popup">
+        <label for="item-ID">Item ID</label>
+        <input type="text" id="item-ID" placeholder="e.g. 12345" required>
 
-            <label for="item-name">Item Name</label>
-            <input type="text" id="item-name" placeholder="e.g. Apple" required>
+        <label for="item-name">Item Name</label>
+        <input type="text" id="item-name" placeholder="e.g. Apple" required>
 
-            <label for="item-desc">Description</label>
-            <input type="text" id="item-desc" placeholder="Short description" required>
+        <label for="item-desc">Description</label>
+        <input type="text" id="item-desc" placeholder="e.g. Fresh apples" required>
 
-            <label for="item-category">Category</label>
-            <input type="text" id="item-category" placeholder="e.g. Grocery" required>
+        <label for="item-category">Category</label>
+        <input type="text" id="item-category" placeholder="e.g. Fruit" required>
 
-            <label for="item-qty">Quantity</label>
-            <input type="number" id="item-qty" placeholder="e.g. 1000" required>
+        <label for="item-qty">Quantity</label>
+        <input type="number" id="item-qty" placeholder="e.g. 100 KG/Ltr" required>
 
-            <label for="item-price">Price</label>
-            <input type="text" id="item-price" placeholder="e.g. 50" required>
+        <label for="item-price">Price</label>
+        <input type="number" id="item-price" placeholder="₹ e.g. 50" required>
 
-            <label for="item-supplier">Supplier</label>
-            <input type="text" id="item-supplier" placeholder="Supplier name" required>
+        <label for="item-supplier">Supplier</label>
+        <input type="text" id="item-supplier" placeholder="e.g. ABC Traders">
 
-            <label for="item-location">Location</label>
-            <input type="text" id="item-location" placeholder="City / Address" required>
+        <label for="item-location">Location</label>
+        <input type="text" id="item-location" placeholder="e.g. Mumbai">
 
-            <button type="submit" class="add-btn" style="margin-top:10px;">Add Item</button>
-          </form>
-        </div>
+        <button type="submit">Add Item</button>
+      </form>
       </div>
+    </div>
 
     <script type="module" src="../backend/inventory.js"></script>
     <script>
       // Show popup on add button click
       document.getElementById('show-add-popup').onclick = function() {
-        document.getElementById('fluid-popup').style.display = 'flex';
+      document.getElementById('fluid-popup').style.display = 'flex';
       };
     </script>
     <script type="module">

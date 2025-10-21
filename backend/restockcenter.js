@@ -109,7 +109,12 @@ async function loadInventoryForProcurement(uid) {
       <tr>
         <td>${item.itemID}</td>
         <td>${item.itemName}</td>
-        <td>${item.quantity}</td>
+        <td>
+          <div class="input-with-unit">
+            <input type="number" value="${item.quantity}" placeholder="e.g. 100" style="width:80px;" disabled>
+            <span class="unit">KG/Ltr</span>
+          </div>
+        </td>
         <td>
           <span class="toggle-switch" onclick="window.togglePreset('${itemDocId}', ${!item.presetMode})">
             <span class="toggle-track ${item.presetMode ? 'on' : ''}">
@@ -119,10 +124,16 @@ async function loadInventoryForProcurement(uid) {
           </span>
         </td>
         <td>
-          <input type="number" min="0" value="${item.presetQty || ""}" style="width:60px;" onchange="window.setPresetQty('${itemDocId}', this.value)">
+          <div class="input-with-unit">
+            <input type="number" min="0" value="${item.presetQty || ""}" placeholder="e.g. 50" style="width:80px;" onchange="window.setPresetQty('${itemDocId}', this.value)">
+            <span class="unit">KG/Ltr</span>
+          </div>
         </td>
         <td>
-          <input type="number" min="1" value="${requestQty || ""}" style="width:60px;" onchange="window.setRequestQty('${itemDocId}', this.value)">
+          <div class="input-with-unit">
+            <input type="number" min="1" value="${requestQty || ""}" placeholder="e.g. 20" style="width:80px;" onchange="window.setRequestQty('${itemDocId}', this.value)">
+            <span class="unit">KG/Ltr</span>
+          </div>
           ${seasonalTag}
           ${mlTag}
         </td>

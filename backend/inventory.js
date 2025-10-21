@@ -78,10 +78,10 @@ async function loadInventory(uid) {
       <td>${item.description}</td>
       <td>${item.category}</td>
       <td>
-        <input type="number" class="editable-input" value="${item.quantity}" data-id="${docSnap.id}" data-field="quantity">
+        <input type="number" class="editable-input" value="${item.quantity}" data-id="${docSnap.id}" data-field="quantity"> KG/Ltr
       </td>
       <td>
-        <input type="number" class="editable-input" value="${item.price}" data-id="${docSnap.id}" data-field="price">
+        ₹ <input type="number" class="editable-input" value="${item.price}" data-id="${docSnap.id}" data-field="price">
       </td>
       <td>${item.supplier}</td>
       <td>${item.location}</td>
