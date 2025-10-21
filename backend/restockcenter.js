@@ -21,33 +21,22 @@ onAuthStateChanged(auth, async (user) => {
 async function loadInventoryForProcurement(uid) {
   tableBody.innerHTML = "";
   const inventorySnap = await getDocs(collection(db, "users", uid, "inventory"));
+  const items = [];
   for (const itemDoc of inventorySnap.docs) {
     const item = itemDoc.data();
+    items.push({ item, itemDocId: itemDoc.id });
+  }
+
+  // Render all rows first, with placeholders for tags
+  for (const { item, itemDocId } of items) {
     const presetMode = item.presetMode || false;
     const presetQty = Number(item.presetQty) || 0;
     const requestQty = Number(item.requestQty) || 0; // This is the user-set request quantity
     const quantity = Number(item.quantity) || 0;
 
-    // ensure tags exist (call helpers if available) - show only friendly label, no JSON fallback
-    let seasonalTag = "";
-    try {
-      const seasonal = await getSeasonalDemand?.(item.itemID);
-      if (seasonal) {
-        const label = typeof seasonal === "string"
-          ? seasonal
-          : (seasonal.label || seasonal.tag || (typeof seasonal.summary === "string" ? seasonal.summary : null));
-        if (label) seasonalTag = `<span class="tag seasonal">${label}</span>`;
-      }
-    } catch (e) { seasonalTag = ""; }
-
-    let mlTag = "";
-    try {
-      const ml = await getInventoryTrendPrediction?.(item.itemID);
-      if (ml) {
-        const label = typeof ml === "string" ? ml : (ml.label || ml.prediction || null);
-        if (label) mlTag = `<span class="tag ml">${label}</span>`;
-      }
-    } catch (e) { mlTag = ""; }
+    // Placeholders for tags
+    let seasonalTag = `<span class="tag seasonal" data-itemid="${item.itemID}">⏳</span>`;
+    let mlTag = `<span class="tag ml" data-itemid="${item.itemID}">⏳</span>`;
 
     // Check if procurement request already exists for this item and is active (open/pending/ordered)
     let existingRequest = null;
@@ -122,7 +111,7 @@ async function loadInventoryForProcurement(uid) {
         <td>${item.itemName}</td>
         <td>${item.quantity}</td>
         <td>
-          <span class="toggle-switch" onclick="window.togglePreset('${itemDoc.id}', ${!item.presetMode})">
+          <span class="toggle-switch" onclick="window.togglePreset('${itemDocId}', ${!item.presetMode})">
             <span class="toggle-track ${item.presetMode ? 'on' : ''}">
               <span class="toggle-knob"></span>
               <span class="toggle-label">${item.presetMode ? 'On' : 'Off'}</span>
@@ -130,10 +119,10 @@ async function loadInventoryForProcurement(uid) {
           </span>
         </td>
         <td>
-          <input type="number" min="0" value="${item.presetQty || ""}" style="width:60px;" onchange="window.setPresetQty('${itemDoc.id}', this.value)">
+          <input type="number" min="0" value="${item.presetQty || ""}" style="width:60px;" onchange="window.setPresetQty('${itemDocId}', this.value)">
         </td>
         <td>
-          <input type="number" min="1" value="${requestQty || ""}" style="width:60px;" onchange="window.setRequestQty('${itemDoc.id}', this.value)">
+          <input type="number" min="1" value="${requestQty || ""}" style="width:60px;" onchange="window.setRequestQty('${itemDocId}', this.value)">
           ${seasonalTag}
           ${mlTag}
         </td>
@@ -142,7 +131,57 @@ async function loadInventoryForProcurement(uid) {
       </tr>
     `;
   }
+
+  // After rendering, annotate with AI tags
+  annotateAIDemandTags();
 }
+
+// --- AI Demand Tag beside Request Qty ---
+async function annotateAIDemandTags() {
+  const tableBody = document.querySelector('#procurement-table tbody');
+  if (!tableBody) return;
+  const rows = Array.from(tableBody.querySelectorAll('tr'));
+
+  await Promise.all(rows.map(async (row) => {
+    // Use item name (column index 1)
+    const itemNameCell = row.cells[1];
+    if (!itemNameCell) return;
+    const itemName = itemNameCell.textContent.trim();
+    if (!itemName) return;
+
+    // Find the Request Qty cell (index 5)
+    const requestQtyCell = row.cells[5];
+    if (!requestQtyCell) return;
+
+    // Remove any existing AI/ML tags
+    Array.from(requestQtyCell.querySelectorAll('.tag, .ai-demand-tag')).forEach(tag => tag.remove());
+
+    // Create the AI demand tag span
+    let aiTag = document.createElement('span');
+    aiTag.className = 'ai-demand-tag';
+    aiTag.style.marginLeft = '8px';
+
+    // Fetch AI demand
+    try {
+      const data = await getSeasonalDemand(itemName);
+      if (data && typeof data.demand === "boolean") {
+        aiTag.textContent = data.demand ? "Increase" : "Decrease";
+        aiTag.title = data.reason || "";
+        aiTag.style.color = data.demand ? "#1db954" : "#d9534f";
+        aiTag.style.fontWeight = "bold";
+        aiTag.style.cursor = "help";
+        requestQtyCell.appendChild(aiTag);
+      }
+    } catch {
+      // Do not show anything if error
+    }
+  }));
+}
+
+// Wait for DOM and table to be populated, then annotate
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(annotateAIDemandTags, 600);
+});
 
 // popup or section to show offers (restored old UI but keep new logic)
 window.viewOffers = async (uid, globalProcurementId, userRequestId) => {

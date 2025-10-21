@@ -399,26 +399,13 @@ th {
   box-shadow: 0 0 8px #4cd96455;
   background: #b3e6c1;
 }
-.ai-tag {
-  display: inline-block;
+
+.ai-demand-tag {
   margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 8px;
-  font-size: 0.95em;
-  font-weight: 600;
-  cursor: pointer;
+  font-size: 1em;
+  font-weight: bold;
   vertical-align: middle;
-}
-.seasonal-tag {
-  background: #ffe066;
-  color: #333;
-}
-.ml-tag {
-  background: #cce5ff;
-  color: #0056b3;
-}
-.ai-tag:hover {
-  background: #ffd700;
+  cursor: help;
 }
 @media (max-width: 900px) {
   .navbar {
