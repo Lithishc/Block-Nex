@@ -1,9 +1,9 @@
 # 🚀 Block Nex (In Development)
 
-A modern, web-based **Block Nex (Supply Chain Management System)** designed to automate inventory tracking, procurement, and supplier-dealer interactions — with planned integration of blockchain for transparency and traceability.
+A modern, web-based **Block Nex (Supply Chain Management System)** designed to automate inventory tracking, procurement, and supplier-dealer interactions — with advanced AI-powered analytics and planned integration of blockchain and digital certificate contracts for transparency, traceability, and trust.
 
 > 🎓 **Final Year B.E. Project (2025)**  
-> Developed as part of the Bachelor of Engineering (B.E.) curriculum for academic submission and research.
+> Developed as part of the Bachelor of Engineering (B.E.) curriculum for academic submission and research.  
 > ⚠️ This project is currently under development. Blockchain components are yet to be added.
 
 ---
@@ -14,6 +14,8 @@ A modern, web-based **Block Nex (Supply Chain Management System)** designed to a
 - Add, edit, and manage inventory items
 - Set preset reorder levels per item
 - Auto-generate procurement requests when stock falls below thresholds
+- **AI-powered inventory trend analysis:**  
+  Automatically analyzes inventory history to suggest if an item is high-selling or low-selling, helping dealers adjust procurement quantities.
 - View supplier offers and accept/reject them
 - Track order status and update inventory on fulfillment
 
@@ -31,17 +33,24 @@ A modern, web-based **Block Nex (Supply Chain Management System)** designed to a
 - Real-time notifications for procurement, offers, and orders
 - Notification UI separated for clarity and maintainability
 
+### 🤖 AI & Analytics
+- **Inventory trend prediction:**  
+  Uses local machine learning logic to analyze inventory history and provide actionable recommendations (e.g., "Trend ↑" for high-selling, "Trend ↓" for low-selling items).
+- Seasonal demand forecasting using AI
+
 ---
 
 ## 🧱 Tech Stack
 
-| Layer       | Technology                |
-|-------------|---------------------------|
-| Frontend    | HTML, CSS, Vanilla JS     |
-| Backend     | Firebase Firestore (NoSQL)|
-| Auth        | Firebase Authentication   |
-| Hosting     | Firebase / GitHub Pages   |
-| Planned     | Blockchain (Smart Contracts) |
+| Layer       | Technology                                      |
+|-------------|-------------------------------------------------|
+| Frontend    | HTML, CSS, Vanilla JS                           |
+| Backend     | Node.js, Firebase Firestore (NoSQL)             |
+| Auth        | Firebase Authentication                         |
+| Hosting     | Firebase / GitHub Pages                         |
+| AI/ML       | Custom JS logic, Gemini API, OpenAI (planned)   |
+| Blockchain  | Smart Contracts, Digital Certificate Contracts (planned) |
+| Utilities   | dotenv                                          |
 
 ---
 
@@ -80,9 +89,10 @@ Block Nex/
 │   ├── registerscript.js
 │   ├── supplier-details.js
 │   ├── toast.js
+│   ├── ml-inventory-trend.js   # <--- AI inventory trend logic
 │   └── ...
 ├── index.html
-└── README.me
+└── README.md
 
 ---
 
@@ -120,11 +130,18 @@ Screenshots coming soon!
 
 To run locally:
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Lithishc/Block-Nex.git
-   ```
-2. Open the project folder in [Visual Studio Code](https://code.visualstudio.com/).
+1. Install [Node.js](https://nodejs.org/) (required for backend and AI features).
+2. Clone the repository:
+  ```bash
+  git clone https://github.com/Lithishc/Block-Nex.git
+  ```
+3. Install dependencies (including dotenv):
+  ```bash
+  npm install dotenv
+  # or if using package.json:
+  npm install
+  ```
+4. Open the project folder in [Visual Studio Code](https://code.visualstudio.com/()).
 
 ## License
 
