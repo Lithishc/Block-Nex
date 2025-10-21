@@ -1,10 +1,10 @@
-import { auth, db } from "./firebase-config.js";
+import { auth, db } from "../functions/firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { collection, getDocs, doc, updateDoc, addDoc, query, where, getDoc, arrayUnion, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
-import { getSeasonalDemand } from "./chatgpt-helper.js";
-import { getInventoryTrendPrediction } from "./ml-inventory-trend.js";
+import { getSeasonalDemand } from "../functions/chatgpt-helper.js";
+import { getInventoryTrendPrediction } from "../functions/ml-inventory-trend.js";
 import { generateStandardId } from "./id-utils.js";
 
 const tableBody = document.querySelector('#procurement-table tbody');

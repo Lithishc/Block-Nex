@@ -6,11 +6,11 @@
 !LICENSE
 !README*
 !index.html
-!registry.html
 
 # Track everything under frontend/ and backend/
 !frontend/**
 !backend/**
+!functions/**
 
 # Still ignore editor junk
 .vscode/

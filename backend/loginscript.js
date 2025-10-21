@@ -1,5 +1,5 @@
 // Import Firebase modules
-import { auth } from "./firebase-config.js";
+import { auth } from "../functions/firebase-config.js";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 

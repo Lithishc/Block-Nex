@@ -1,6 +1,6 @@
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { app } from "./firebase-config.js";
+import { app } from "../functions/firebase-config.js";
 
 const auth = getAuth(app);
 const db = getFirestore(app);
