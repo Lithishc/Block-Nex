@@ -241,15 +241,40 @@ document.getElementById('offer-form').addEventListener('submit', async function 
 document.getElementById('show-demand-btn').onclick = async function() {
   const resultDiv = document.getElementById('demand-results');
   resultDiv.innerHTML = "<b>Loading...</b>";
+
+  // 1. Get inventory items for the logged-in user
+  const user = auth.currentUser;
+  if (!user) {
+    resultDiv.innerHTML = "<b>Please log in to see your inventory demand.</b>";
+    return;
+  }
+  const invSnap = await getDocs(collection(db, "users", user.uid, "inventory"));
+  const itemNames = [];
+  invSnap.forEach(docSnap => {
+    const d = docSnap.data();
+    if (d.itemName) itemNames.push(d.itemName);
+  });
+
+  if (itemNames.length === 0) {
+    resultDiv.innerHTML = "<b>No items in your inventory.</b>";
+    return;
+  }
+
+  // 2. Ask Gemini about inventory and related items
   try {
-    const response = await fetch("http://localhost:3000/api/chatgpt-seasonal-demand?item=all&type=list");
+    const prompt = `Given these inventory items: ${itemNames.join(", ")}, list which are currently in high demand in India, and also include any related items (alternatives, substitutes, or complementary goods) that are in high demand. For each, reply in the format: name - reason. Only include items that are in demand.`;
+    const response = await fetch("http://localhost:3000/api/chatgpt-seasonal-demand?item=all&type=list", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    });
     const data = await response.json();
-    if (data.items && Array.isArray(data.items)) {
-      resultDiv.innerHTML = "<b>Current High-Demand Items:</b><ul>" +
+    if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+      resultDiv.innerHTML = "<b>Your Inventory & Related Items in High Demand:</b><ul>" +
         data.items.map(i => `<li><b>${i.name}</b>: ${i.reason}</li>`).join("") +
         "</ul>";
     } else {
-      resultDiv.innerHTML = "<b>No data from AI model.</b>";
+      resultDiv.innerHTML = "<b>No inventory or related items are currently in high demand.</b>";
     }
   } catch (err) {
     resultDiv.innerHTML = "<b>AI API not available.</b>";

@@ -6,7 +6,6 @@ const router = express.Router();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-console.log("Gemini API Key:", GEMINI_API_KEY);
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
@@ -22,8 +21,11 @@ router.get("/api/chatgpt-seasonal-demand", async (req, res) => {
   const type = req.query.type;
 
   if (type === "list") {
-    // Ask Gemini for a list of high-demand items in India right now
-    const prompt = `List 5 items that are in high demand in India right now and give a short reason for each. Format: name - reason.`;
+    // Accept custom prompt from POST body or use default
+    let prompt = req.body?.prompt;
+    if (!prompt) {
+      prompt = `List 5 items that are in high demand in India right now and give a short reason for each. Format: name - reason.`;
+    }
     try {
       const answer = await askGemini(prompt);
       console.log("Gemini raw answer:", answer); // <-- Add this line
@@ -46,10 +48,13 @@ router.get("/api/chatgpt-seasonal-demand", async (req, res) => {
 
   // For a single item: ask Gemini about demand
   let prompt;
+  const now = new Date();
+  const monthYear = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
   if (type === "market") {
-    prompt = `Is "${item}" currently in high demand in India due to real-world factors such as festivals, holidays, or market trends? Reply ONLY with "yes" or "no" on the first line. Then, in a new line, explain the reason.`;
+    prompt = `As of ${monthYear}, is "${item}" currently in high demand in India due to real-world factors such as festivals, holidays, or market trends? Reply ONLY with "yes" or "no" on the first line. Then, in a new line, explain the reason.`;
   } else {
-    prompt = `This month in India, is "${item}" in high demand due to any festival, holiday, or season? Reply ONLY with "increase" if yes, or "no increase" if no. Then, in a new line, explain the reason.`;
+    prompt = `As of ${monthYear}, is "${item}" in high demand in India due to any festival, holiday, or season? Reply ONLY with "increase" if yes, or "no increase" if no. Then, in a new line, explain the reason.`;
   }
 
   try {
@@ -69,6 +74,32 @@ router.get("/api/chatgpt-seasonal-demand", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Gemini API error", details: err.message });
   }
+});
+
+router.post("/api/chatgpt-seasonal-demand", express.json(), async (req, res) => {
+  const type = req.query.type;
+  if (type === "list") {
+    let prompt = req.body?.prompt;
+    if (!prompt) {
+      prompt = `List 5 items that are in high demand in India right now and give a short reason for each. Format: name - reason.`;
+    }
+    try {
+      const answer = await askGemini(prompt);
+      console.log("Gemini raw answer:", answer);
+      const items = answer
+        .split('\n')
+        .map(line => line.replace(/^[\-\*\d\.]+\s*/, ''))
+        .map(line => {
+          const [name, ...reasonArr] = line.split('-');
+          return { name: name?.trim(), reason: reasonArr.join('-').trim() };
+        })
+        .filter(i => i.name && i.reason);
+      return res.json({ items });
+    } catch (err) {
+      return res.status(500).json({ error: "Gemini API error", details: err.message });
+    }
+  }
+  res.status(400).json({ error: "Invalid request" });
 });
 
 export default router;
