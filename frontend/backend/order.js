@@ -1,6 +1,6 @@
 import { auth, db } from "../../functions/firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { collection, getDocs, doc, updateDoc, getDoc, query, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, setDoc, query, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
 
 // Digital contract helpers
@@ -18,21 +18,25 @@ function generateContractText(order, dealerGSTIN, supplierGSTIN) {
 }
 
 async function saveContractSignature(globalOrderId, who, signature) {
-  // Update in globalOrders
-  const globalOrderRef = doc(db, "globalOrders", globalOrderId);
-  await updateDoc(globalOrderRef, { [`contractSignatures.${who}`]: signature });
+  try {
+    const globalOrderRef = doc(db, "globalOrders", globalOrderId);
+    await updateDoc(globalOrderRef, { [`contractSignatures.${who}`]: signature });
 
-  // Update in all user orders referencing this globalOrderId
-  const ordersQuery = query(collectionGroup(db, "orders"), where("globalOrderId", "==", globalOrderId));
-  const ordersSnap = await getDocs(ordersQuery);
-  for (const docSnap of ordersSnap.docs) {
-    await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
-  }
-  // Update in supplier's orderFulfilment
-  const fulfilQuery = query(collectionGroup(db, "orderFulfilment"), where("globalOrderId", "==", globalOrderId));
-  const fulfilSnap = await getDocs(fulfilQuery);
-  for (const docSnap of fulfilSnap.docs) {
-    await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
+    const ordersQuery = query(collectionGroup(db, "orders"), where("globalOrderId", "==", globalOrderId));
+    const ordersSnap = await getDocs(ordersQuery);
+    for (const docSnap of ordersSnap.docs) {
+      await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
+    }
+
+    const fulfilQuery = query(collectionGroup(db, "orderFulfilment"), where("globalOrderId", "==", globalOrderId));
+    const fulfilSnap = await getDocs(fulfilQuery);
+    for (const docSnap of fulfilSnap.docs) {
+      await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
+    }
+    return true;
+  } catch (err) {
+    console.error("saveContractSignature error:", err);
+    return false;
   }
 }
 
@@ -171,7 +175,7 @@ window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId
   for (const orderDoc of ordersSnap2.docs) {
     await updateDoc(doc(db, "users", uid, "orders", orderDoc.id), { status: "fulfilled", fulfilledAt: new Date() });
   }
-
+  window.showTracking(uid, globalOrderId, globalProcurementId);
   createNotification("Procurement marked completed and inventory updated", "success");
   loadOrders(uid);
 };
@@ -297,33 +301,42 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
     if (signBtn) {
       signBtn.onclick = async () => {
         // --- NEW: True Digital Signature ---
-        let privateKeyJwk = JSON.parse(localStorage.getItem("privateKeyJwk"));
-        if (!privateKeyJwk) {
-          alert("Private key not found. Please import or generate your key pair.");
+        const currentUid = auth.currentUser?.uid || uid;
+        if (!currentUid) {
+          alert("User not found. Please login again.");
           return;
         }
+        const { privateKeyJwk } = await ensureUserKeys(currentUid);
         let signature = await signContractText(contractText, privateKeyJwk);
         if (isDealer) {
-          await saveContractSignature(globalOrderId, 'dealer', signature);
-          // Notify supplier to sign
-          if (order.supplierUid) {
-            await createNotification(order.supplierUid, {
-              type: "contract_sign",
-              title: "Dealer Signed Contract",
-              body: "Dealer has signed the contract. Please review and sign.",
-              related: { globalOrderId }
-            });
+          const success = await saveContractSignature(globalOrderId, 'dealer', signature);
+          if (success) {
+            // Notify supplier to sign
+            if (order.supplierUid) {
+              await createNotification(order.supplierUid, {
+                type: "contract_sign",
+                title: "Dealer Signed Contract",
+                body: "Dealer has signed the contract. Please review and sign.",
+                related: { globalOrderId }
+              });
+            }
+            // Refresh UI
+            window.showTracking(uid, globalOrderId, globalProcurementId);
           }
         } else if (isSupplier) {
-          await saveContractSignature(globalOrderId, 'supplier', signature);
-          // Notify dealer that supplier signed
-          if (order.dealerUid) {
-            await createNotification(order.dealerUid, {
-              type: "contract_sign",
-              title: "Supplier Signed Contract",
-              body: "Supplier has signed the contract.",
-              related: { globalOrderId }
-            });
+          const success = await saveContractSignature(globalOrderId, 'supplier', signature);
+          if (success) {
+            // Notify dealer that supplier signed
+            if (order.dealerUid) {
+              await createNotification(order.dealerUid, {
+                type: "contract_sign",
+                title: "Supplier Signed Contract",
+                body: "Supplier has signed the contract.",
+                related: { globalOrderId }
+              });
+            }
+            // Refresh UI
+            window.showTracking(uid, globalOrderId, globalProcurementId);
           }
         }
       };
@@ -415,27 +428,39 @@ async function generateAndStoreKeyPair() {
   }
 }
 
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    let privateKeyJwk = localStorage.getItem("privateKeyJwk");
-    let publicKeyJwk = localStorage.getItem("publicKeyJwk");
-    if (!privateKeyJwk || !publicKeyJwk) {
-      // Generate new key pair
-      const keyPair = await window.crypto.subtle.generateKey(
-        {
-          name: "RSASSA-PKCS1-v1_5",
-          modulusLength: 2048,
-          publicExponent: new Uint8Array([1, 0, 1]),
-          hash: "SHA-256"
-        },
-        true,
-      );
-      const privateJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
-      const publicJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
-      localStorage.setItem("privateKeyJwk", JSON.stringify(privateJwk));
-      localStorage.setItem("publicKeyJwk", JSON.stringify(publicJwk));
-      // Upload public key to Firestore under user's info
-      await updateDoc(doc(db, "info", user.uid), { publicKeyJwk: publicJwk });
-    }
+// ensure keypair helper (private stored locally, public stored in Firestore info/{uid})
+async function ensureUserKeys(uid) {
+  let privateKeyJwk = null;
+  let publicKeyJwk = null;
+  try {
+    privateKeyJwk = JSON.parse(localStorage.getItem(`privateKeyJwk_${uid}`) || "null");
+    publicKeyJwk = JSON.parse(localStorage.getItem(`publicKeyJwk_${uid}`) || "null");
+    if (privateKeyJwk && publicKeyJwk) return { privateKeyJwk, publicKeyJwk };
+
+    // Generate new keypair
+    const keyPair = await window.crypto.subtle.generateKey(
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256"
+      },
+      true,
+      ["sign", "verify"]
+    );
+    privateKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+    publicKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
+
+    // Store locally with UID
+    localStorage.setItem(`privateKeyJwk_${uid}`, JSON.stringify(privateKeyJwk));
+    localStorage.setItem(`publicKeyJwk_${uid}`, JSON.stringify(publicKeyJwk));
+
+    // Store public key in Firestore
+    await updateDoc(doc(db, "info", uid), { publicKeyJwk: publicKeyJwk });
+
+    return { privateKeyJwk, publicKeyJwk };
+  } catch (err) {
+    console.error("ensureUserKeys error:", err);
+    throw err;
   }
-});
+}

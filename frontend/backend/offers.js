@@ -308,54 +308,52 @@ window.UpdateTracking = async (uid, globalOrderId) => {
     const statusSelect = document.getElementById('status-select');
     if (signBtn) {
       signBtn.onclick = async () => {
-        // --- True Digital Signature ---
-        let privateKeyJwk = JSON.parse(localStorage.getItem("privateKeyJwk"));
-        if (!privateKeyJwk) {
-          alert("Private key not found. Please import or generate your key pair.");
-          return;
-        }
-        let signature = await signContractText(contractText, privateKeyJwk);
-        if (isDealer) {
-          await saveContractSignature(globalOrderId, 'dealer', signature);
-          // Notify supplier to sign
-          if (order.supplierUid) {
-            await createNotification(order.supplierUid, {
-              type: "contract_sign",
-              title: "Dealer Signed Contract",
-              body: "Dealer has signed the contract. Please review and sign.",
-              related: { globalOrderId }
-            });
+        try {
+          // Ensure keypair exists (generate if missing)
+          const { privateKeyJwk } = await ensureUserKeys(uid);
+
+          let signature = await signContractText(contractText, privateKeyJwk);
+
+          if (isDealer) {
+            await saveContractSignature(globalOrderId, 'dealer', signature);
+            if (order.supplierUid) {
+              await createNotification(order.supplierUid, {
+                type: "contract_sign",
+                title: "Dealer Signed Contract",
+                body: "Dealer has signed the contract. Please review and sign.",
+                related: { globalOrderId }
+              });
+            }
+          } else if (isSupplier) {
+            await saveContractSignature(globalOrderId, 'supplier', signature);
+            if (order.dealerUid) {
+              await createNotification(order.dealerUid, {
+                type: "contract_sign",
+                title: "Supplier Signed Contract",
+                body: "Supplier has signed the contract.",
+                related: { globalOrderId }
+              });
+            }
           }
-        } else if (isSupplier) {
-          await saveContractSignature(globalOrderId, 'supplier', signature);
-          // Notify dealer that supplier signed
-          if (order.dealerUid) {
-            await createNotification(order.dealerUid, {
-              type: "contract_sign",
-              title: "Supplier Signed Contract",
-              body: "Supplier has signed the contract.",
-              related: { globalOrderId }
-            });
-          }
+          showToast('Contract signed successfully!');
+          location.reload(); // <-- Fix: reload page to show signed status
+        } catch (err) {
+          console.error("Sign contract failed:", err);
+          alert("Signing failed. See console for details.");
         }
-        alert('Contract signed successfully!');
-        document.getElementById('order-tracking-popup').remove();
-        window.UpdateTracking(uid, globalOrderId); // Refresh popup
       };
     }
     if (downloadBtn) {
       downloadBtn.onclick = () => {
         let certText = contractText + `\n\nDealer Signature: ${contractSignatures.dealer || "-"}\nSupplier Signature: ${contractSignatures.supplier || "-"}`;
         downloadCertificate(`Order_${globalOrderId}_Certificate.txt`, certText);
-            };
-          }
-          if (updateStatusBtn && statusSelect) {
-            updateStatusBtn.onclick = async () => {
+      };
+    }
+    if (updateStatusBtn && statusSelect) {
+      updateStatusBtn.onclick = async () => {
         const newStatus = statusSelect.value;
         if (!newStatus) return;
-        // Update status in globalOrders
         await updateDoc(doc(db, "globalOrders", globalOrderId), { status: newStatus });
-        // Optionally, add to tracking history
         const trackingUpdate = {
           date: new Date().toISOString(),
           status: newStatus,
@@ -368,7 +366,6 @@ window.UpdateTracking = async (uid, globalOrderId) => {
           const trackingArr = orderData.tracking || [];
           trackingArr.push(trackingUpdate);
           await updateDoc(globalOrderRef, { tracking: trackingArr });
-          // --- Notify both dealer and supplier ---
           if (orderData.dealerUid) {
             await createNotification(orderData.dealerUid, {
               type: "order_status",
@@ -389,9 +386,46 @@ window.UpdateTracking = async (uid, globalOrderId) => {
         showToast('Order status updated!');
         document.getElementById('order-tracking-popup').remove();
         window.UpdateTracking(uid, globalOrderId); // Refresh popup
-            };
-          }
-        }, 100);
+      };
+    }
+  }, 100);
 
   // Status update logic remains unchanged (as in your current code)
 };
+
+// Helper to ensure keypair exists and is stored correctly
+async function ensureUserKeys(uid) {
+  let privateKeyJwk = null;
+  let publicKeyJwk = null;
+  try {
+    privateKeyJwk = JSON.parse(localStorage.getItem(`privateKeyJwk_${uid}`) || "null");
+    publicKeyJwk = JSON.parse(localStorage.getItem(`publicKeyJwk_${uid}`) || "null");
+    if (privateKeyJwk && publicKeyJwk) return { privateKeyJwk, publicKeyJwk };
+
+    // Generate new keypair
+    const keyPair = await window.crypto.subtle.generateKey(
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256"
+      },
+      true,
+      ["sign", "verify"]
+    );
+    privateKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
+    publicKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
+
+    // Store locally with UID
+    localStorage.setItem(`privateKeyJwk_${uid}`, JSON.stringify(privateKeyJwk));
+    localStorage.setItem(`publicKeyJwk_${uid}`, JSON.stringify(publicKeyJwk));
+
+    // Store public key in Firestore
+    await updateDoc(doc(db, "info", uid), { publicKeyJwk: publicKeyJwk });
+
+    return { privateKeyJwk, publicKeyJwk };
+  } catch (err) {
+    console.error("ensureUserKeys error:", err);
+    throw err;
+  }
+}
