@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { db } from "../functions/firebase-config.js";
+import { db } from "../../functions/firebase-config.js";
 import { collection, orderBy, query, onSnapshot, updateDoc, doc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
 const auth = getAuth();

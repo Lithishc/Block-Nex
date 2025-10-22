@@ -1,10 +1,11 @@
 // Import Firebase modules from your config and Firestore functions from CDN
-import { auth, db } from "../functions/firebase-config.js";
+import { auth, db } from "../../functions/firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, getDoc, query, where, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
 import { generateStandardId } from "./id-utils.js";
+
 
 // DOM Elements
 const popup = document.getElementById('fluid-popup');
@@ -31,7 +32,7 @@ document.querySelector('.close-btn').onclick = function() {
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     alert("Please login to access your inventory.");
-    window.location.href = "../index.html";
+    window.location.href = "../frontend/index.html";
     return;
   }
   loadInventory(user.uid);

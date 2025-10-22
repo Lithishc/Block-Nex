@@ -68,7 +68,7 @@
       </div>
     </div>
 
-    <script type="module" src="../backend/inventory.js"></script>
+    <script type="module" src="./backend/inventory.js"></script>
     <script>
       // Show popup on add button click
       document.getElementById('show-add-popup').onclick = function() {
@@ -76,12 +76,12 @@
       };
     </script>
     <script type="module">
-    import { loadNavbar } from '../backend/navbar.js';
+    import { loadNavbar } from './backend/navbar.js';
     loadNavbar();
   </script>
   <!-- Example inside any page after navbar load -->
-  <script type="module" src="../backend/notifications-listener.js"></script>
-  <script type="module" src="../backend/toast.js"></script>
-  <script type="module" src="../backend/offers-badge-listener.js"></script>
+  <script type="module" src="./backend/notifications-listener.js"></script>
+  <script type="module" src="./backend/toast.js"></script>
+  <script type="module" src="./backend/offers-badge-listener.js"></script>
 </body>
 </html>
