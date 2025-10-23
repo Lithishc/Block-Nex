@@ -113,18 +113,6 @@ th {
   overflow-y: auto;
   position: relative;
 }
-.close-btn {
-  position: absolute;
-  top: 14px;
-  right: 18px;
-  background: #eee;
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
 .offer-card {
   background: #fff;
   border-radius: 22px;
@@ -238,37 +226,27 @@ th {
 
 .close-btn {
   position: absolute;
-  top: 14px;
-  right: 18px;
-  background: #eee;
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-.close-btn {
-  position: absolute;
   top: 18px;
   right: 22px;
-  background: #e0e7ff;
-  color: #003366;
-  border: none;
-  border-radius: 999px;
-  width: 38px;
-  height: 38px;
-  font-size: 1.3rem;
-  font-weight: bold;
+  background: #e0e7ff !important;
+  color: #003366 !important;
+  border: none !important;
+  border-radius: 999px !important;
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 1.3rem !important;
+  font-weight: bold !important;
   cursor: pointer;
-  box-shadow: 0 2px 8px #0001;
+  box-shadow: 0 2px 8px #0001 !important;
   transition: background 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 .close-btn:hover {
-  background: #b3c6ff;
+   background: #b3c6ff;
   color: #001a33;
 }
 

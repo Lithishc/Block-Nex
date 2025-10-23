@@ -267,7 +267,7 @@ window.UpdateTracking = async (uid, globalOrderId) => {
   }
 
   let html = `
-    <div>
+    <div class="popup-content" style="max-height:80vh;overflow-y:auto;">
       <button class="close-btn" onclick="document.getElementById('order-tracking-popup').remove()">&times;</button>
       <h2>Order Tracking</h2>
       <div style="margin-bottom:16px;">
@@ -292,12 +292,12 @@ window.UpdateTracking = async (uid, globalOrderId) => {
           `).join("")}
         </tbody>
       </table>
-      <button onclick="document.getElementById('order-tracking-popup').remove()">Close</button>
     </div>
   `;
-
+  
   let popup = document.createElement('div');
   popup.id = 'order-tracking-popup';
+  popup.className = 'popup';
   popup.innerHTML = html;
   document.body.appendChild(popup);
 

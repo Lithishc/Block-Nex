@@ -496,10 +496,23 @@ th {
 }
 
 /* submit button: keep pill style and full-width but slightly smaller */
-.fluid-popup-content form .add-btn {
-  width: 100%;
-  padding: 10px 16px;
-  margin-top: 8px;
+.fluid-popup-content form button[type="submit"] {
+  display: block;
+  margin: 18px auto 0 auto;
+  width: auto;
+  min-width: 160px;
+  max-width: 240px;
+  padding: 12px 32px;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background: #004080;
+  color: #fff;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.fluid-popup-content form button[type="submit"]:hover {
+  background: #0066cc;
 }
 
 /* ensure popup scrollbars don't add extra spacing on narrow screens */

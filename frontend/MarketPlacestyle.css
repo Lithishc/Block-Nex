@@ -115,19 +115,24 @@ th {
 }
 .close-btn {
   position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  color: #6b7280;
-  font-size: 22px;
-  line-height: 36px;
-  text-align: center;
+  top: 18px;
+  right: 22px;
+  background: #e0e7ff !important;
+  color: #003366 !important;
+  border: none !important;
+  border-radius: 999px !important;
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 1.3rem !important;
+  font-weight: bold !important;
   cursor: pointer;
-  transition: background .15s ease, color .15s ease, transform .08s ease;
+  box-shadow: 0 2px 8px #0001 !important;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 .close-btn:hover {
   background: #eef2ff;

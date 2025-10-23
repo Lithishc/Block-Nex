@@ -278,7 +278,7 @@ window.viewOffers = async (uid, globalProcurementId, userRequestId) => {
     popup.className = 'popup';
     popup.innerHTML = `
       <div class="popup-content" style="position:relative;max-width:640px;padding:22px;border-radius:16px;">
-        <button class="close-btn" onclick="document.getElementById('offers-popup').remove()" style="position:absolute;right:14px;top:12px;border:none;background:#e9eef5;width:36px;height:36px;border-radius:50%;cursor:pointer;">✕</button>
+        <button class="close-btn" onclick="document.getElementById('offers-popup').remove()" ">&times;</button>
         <div id="offers-content"></div>
       </div>
     `;
