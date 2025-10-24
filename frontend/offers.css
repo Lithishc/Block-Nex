@@ -102,24 +102,26 @@
   position: absolute;
   top: 18px;
   right: 22px;
-  background: #e0e7ff;
-  color: #003366;
-  border: none;
-  border-radius: 999px;
-  width: 38px;
-  height: 38px;
-  font-size: 1.3rem;
-  font-weight: bold;
+  background: #e0e7ff !important;
+  color: #003366 !important;
+  border: none !important;
+  border-radius: 999px !important;
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 1.3rem !important;
+  font-weight: bold !important;
   cursor: pointer;
-  box-shadow: 0 2px 8px #0001;
+  box-shadow: 0 2px 8px #0001 !important;
   transition: background 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 #order-tracking-popup .close-btn:hover {
-  background: #b3c6ff;
-  color: #001a33;
+  background: #b3c6ff !important;
+  color: #001a33 !important;
 }
 
 /* Table inside popup */
@@ -146,8 +148,7 @@
 
 /* Pill-shaped dropdown and button for tracking popup */
 #order-tracking-popup select,
-#order-tracking-popup button,
-#order-tracking-popup .close-btn {
+#order-tracking-popup button {
   border-radius: 20px;
   padding: 8px 20px;
   border: none;
