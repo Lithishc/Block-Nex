@@ -5,12 +5,12 @@ import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase
 async function extractPdfText(file) {
   // Wait for PDF.js to be available (poll for up to 5 seconds)
   let tries = 0;
-  while (!window.pdfjsLib && tries < 100) {
+  while (!window.pdfjsDistBuildPdf && tries < 100) {
     await new Promise(res => setTimeout(res, 50));
     tries++;
   }
-  if (!window.pdfjsLib) throw new Error("PDF.js not loaded.");
-  const pdfjsLib = window.pdfjsLib;
+  if (!window.pdfjsDistBuildPdf) throw new Error("PDF.js not loaded.");
+  const pdfjsLib = window.pdfjsDistBuildPdf;
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.js';
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
