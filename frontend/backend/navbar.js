@@ -13,11 +13,20 @@ export function loadNavbar() {
 
       // Highlight active tab
       const path = window.location.pathname.split('/').pop();
+      let pageName = "";
       document.querySelectorAll('.nav-link').forEach(link => {
         if (link.getAttribute('href') === path) {
           link.classList.add('active');
+          // Get only the text node (not badge)
+          pageName = Array.from(link.childNodes)
+            .filter(n => n.nodeType === Node.TEXT_NODE)
+            .map(n => n.textContent.trim())
+            .join(' ');
         }
       });
+      // Set page name beside hamburger for mobile
+      const pageNameSpan = document.querySelector('.navbar-page-name');
+      if (pageNameSpan) pageNameSpan.textContent = pageName;
 
       // Set spinner or blank immediately
       const usernameSpan = document.getElementById('navbar-username');
@@ -61,6 +70,12 @@ export function loadNavbar() {
           window.location.href = "../frontend/index.html";
         });
       }
+
+      // Hamburger menu toggle
+      window.toggleNavbarMenu = function() {
+        const links = document.querySelector('.navbar-links');
+        if (links) links.classList.toggle('open');
+      };
     });
 }
 // Sh0rtcut for loading the active navbar
