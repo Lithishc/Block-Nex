@@ -1,0 +1,96 @@
+body {
+  background: linear-gradient(135deg, #e0e7ff 0%, #f5f7fa 100%);
+  min-height: 100vh;
+}
+
+.verify-container {
+  max-width: 600px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px #0001;
+  padding: 32px 24px;
+}
+
+.verify-container h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.verify-container p {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.verify-form-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+input[type="file"] {
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 1px solid #cce;
+  background: #f5f7fa;
+  font-size: 1em;
+  width: 70%;
+  max-width: 320px;
+}
+
+.pill-btn {
+  display: inline-block;
+  background: #004080;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 32px;
+  font-size: 1.05em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 0;
+}
+
+.pill-btn:hover {
+  background: #0066cc;
+}
+
+.verify-result {
+  margin-top: 24px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #f5f7fa;
+  font-size: 1.1em;
+  border: 1px solid #cce;
+}
+
+.verify-success {
+  color: #1a7f37;
+  font-weight: bold;
+}
+
+.verify-fail {
+  color: #e0103a;
+  font-weight: bold;
+}
+
+.verify-label {
+  font-weight: bold;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+.contract-details {
+  margin-top: 18px;
+  white-space: pre-wrap;
+  font-size: 1em;
+  background: #eef;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #dde;
+  word-break: break-word;
+}

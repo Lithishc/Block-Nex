@@ -15,7 +15,7 @@ async function getSupplierGSTIN(supplierUid) {
 }
 
 function generateContractText(order, dealerGSTIN, supplierGSTIN) {
-  return `Digital Supply Contract\n\nOrder ID: ${order.globalOrderId || "-"}\nItem: ${order.itemName}\nQuantity: ${order.quantity}\nSupplier: ${order.supplier}\nSupplier GSTIN: ${supplierGSTIN}\nDealer GSTIN: ${dealerGSTIN}\nPrice: ₹${order.price}\nDetails: ${order.details}\nDate: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}\n\nBy signing, both parties agree to the above terms.`;
+  return `Digital Supply Contract\n\nOrder ID: ${order.globalOrderId || "-"}\nItem: ${order.itemName}\nQuantity: ${order.quantity}\nSupplier: ${order.supplier}\nSupplier GSTIN: ${supplierGSTIN}\nDealer GSTIN: ${dealerGSTIN}\nPrice: Rs.${order.price}\nDetails: ${order.details}\nDate: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}\n\nBy signing, both parties agree to the above terms.`;
 }
 
 async function saveContractSignature(globalOrderId, who, signature) {
@@ -80,13 +80,67 @@ async function verifyContractSignature(contractText, signatureBase64, publicKeyJ
 }
 
 function downloadCertificate(filename, text) {
-  const blob = new Blob([text], { type: 'text/plain' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('Digital Supply Contract Certificate', 105, 20, { align: 'center' });
+
+  // Subtitle
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(15);
+  doc.text('Digital Supply Contract', 20, 32);
+
+  // Use Times font for contract details to support ₹ symbol
+  doc.setFont('times', 'normal');
+  doc.setFontSize(12);
+  let y = 42;
+  const contractLines = text.split('\n');
+  for (let line of contractLines) {
+    // Stop before signatures
+    if (line.startsWith('Dealer Signature:') || line.startsWith('Supplier Signature:')) break;
+    doc.text(line, 20, y, { align: 'left' });
+    y += 7;
+  }
+
+  // Add a gap before signatures
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('Signatures:', 20, y);
+  y += 9;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+
+  // Extract and wrap signatures
+  const dealerSig = text.match(/Dealer Signature: (.*)/)?.[1] || "-";
+  const supplierSig = text.match(/Supplier Signature: (.*)/)?.[1] || "-";
+
+  // Dealer Signature
+  doc.setFont('helvetica', 'bold');
+  doc.text('Dealer Signature:', 20, y);
+  doc.setFont('helvetica', 'normal');
+  y += 7;
+  const dealerSigLines = doc.splitTextToSize(dealerSig, 170);
+  dealerSigLines.forEach(line => {
+    doc.text(line, 24, y);
+    y += 7;
+  });
+
+  y += 5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Supplier Signature:', 20, y);
+  doc.setFont('helvetica', 'normal');
+  y += 7;
+  const supplierSigLines = doc.splitTextToSize(supplierSig, 170);
+  supplierSigLines.forEach(line => {
+    doc.text(line, 24, y);
+    y += 7;
+  });
+
+  doc.save(filename.replace('.txt', '.pdf'));
 }
 
 const tableBody = document.querySelector('#offers-table tbody');

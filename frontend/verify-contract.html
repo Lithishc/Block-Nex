@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Verify Digital Contract</title>
+  <link rel="stylesheet" href="verify-contract.css">
+  <!-- PDF.js must be loaded BEFORE your module script -->
+  <script src="https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.js"></script>
+  <script type="module" src="./verify-contract.js"></script>
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div class="verify-container">
+    <h2>Verify Digital Contract Certificate</h2>
+    <p>Upload a downloaded contract PDF to verify its authenticity and signatures.</p>
+    <div class="verify-form-row">
+      <input type="file" id="pdf-upload" accept="application/pdf" />
+      <button id="verify-btn" class="pill-btn">Verify Contract</button>
+    </div>
+    <div id="verify-result" class="verify-result" style="display:none;"></div>
+    <div id="contract-details" class="contract-details" style="display:none;"></div>
+  </div>
+  <script type="module">
+    import { loadNavbar } from './backend/navbar.js';
+    loadNavbar();
+  </script>
+</body>
+</html>
