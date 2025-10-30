@@ -71,21 +71,42 @@ async function loadOrders(uid) {
     tableBody.innerHTML = `<tr><td colspan="8">No orders found.</td></tr>`;
     return;
   }
-  ordersSnap.forEach((docSnap) => {
+
+  // Use for..of so we can await global status fetch per row
+  for (const docSnap of ordersSnap.docs) {
     const order = docSnap.data();
     const orderId = order.globalOrderId || docSnap.id; // Always use globalOrderId
     const date = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
     let globalProcurementId = order.globalProcurementId || (order.acceptedOffer && order.acceptedOffer.globalProcurementId) || null;
     let quantity = order.quantity ?? order.requestedQty ?? (order.acceptedOffer && order.acceptedOffer.requestedQty) ?? "-";
 
+    // Pull latest status from globalOrders (authoritative)
+    let latestStatus = order.status || "-";
+    let dealerSigned = false, supplierSigned = false;
+    try {
+      if (orderId) {
+        const gSnap = await getDoc(doc(db, "globalOrders", orderId));
+        if (gSnap.exists()) {
+          const g = gSnap.data();
+          latestStatus = g.status || latestStatus;
+
+          // Check digital contract signatures
+          const sigs = g.contractSignatures || {};
+          dealerSigned = !!(sigs.dealer && sigs.dealer.sig);
+          supplierSigned = !!(sigs.supplier && sigs.supplier.sig);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch global order status for", orderId, e);
+    }
+
+    // Show "Contract Sign Awaiting" until both parties sign
+    const displayStatus = (dealerSigned && supplierSigned) ? latestStatus : "Contract Sign Awaiting";
+
     let statusCell = `
-      <span class="status-text">${order.status}</span>
+      <span class="status-text">${displayStatus}</span>
       <button class="pill-btn" onclick="window.showTracking('${uid}', '${orderId}', '${globalProcurementId}')">Track</button>
     `;
-    if (order.status === "delivered" && globalProcurementId) {
-      statusCell += ` <button onclick="window.markProcurementFulfilled('${uid}','${orderId}', '${globalProcurementId}')"
-        style="margin-left:8px;">Mark as Fulfilled & Update Inventory</button>`;
-    }
 
     tableBody.innerHTML += `
       <tr>
@@ -99,7 +120,7 @@ async function loadOrders(uid) {
         <td>${date.toLocaleString()}</td>
       </tr>
     `;
-  });
+  }
 }
 
 window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId) => {

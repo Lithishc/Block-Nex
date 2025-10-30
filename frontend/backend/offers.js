@@ -65,6 +65,65 @@ onAuthStateChanged(auth, async (user) => {
   loadOffers(user.uid);
 });
 
+function badge(label, kind = "neutral") {
+  const palette = {
+    awaiting: { bg: "#FFF3CD", fg: "#7A5B00" },   // amber
+    process:  { bg: "#E7F1FF", fg: "#0B5ED7" },   // blue
+    fulfilled:{ bg: "#D1F3D5", fg: "#1B7D2B" },   // green
+    accepted: { bg: "#E8F5E9", fg: "#1B7D2B" },   // green-light
+    pending:  { bg: "#EFEFEF", fg: "#333" },      // gray
+    rejected: { bg: "#FAD1D1", fg: "#9B1C1C" },   // red
+    neutral:  { bg: "#EFEFEF", fg: "#333" }
+  };
+  const c = palette[kind] || palette.neutral;
+  return `<span class="offer-status" style="background:${c.bg};color:${c.fg};padding:6px 10px;border-radius:12px;display:inline-block;min-width:140px;text-align:center;">${label}</span>`;
+}
+
+function derivePipelineStatus(offer, globalOrder) {
+  // Default by offer state
+  if (!offer || !offer.status) return { label: "-", kind: "neutral" };
+  const st = (offer.status || "").toLowerCase();
+
+  if (st === "rejected") return { label: "Rejected", kind: "rejected" };
+  if (st === "pending") return { label: "Pending", kind: "pending" };
+
+  // Accepted → check contract signatures and global order status
+  if (st === "accepted") {
+    if (!globalOrder) return { label: "Accepted", kind: "accepted" };
+
+    const sigs = globalOrder.contractSignatures || {};
+    const dealerSigned = !!(sigs.dealer && sigs.dealer.sig);
+    const supplierSigned = !!(sigs.supplier && sigs.supplier.sig);
+
+    if (!(dealerSigned && supplierSigned)) {
+      return { label: "Contract Sign Awaiting", kind: "awaiting" };
+    }
+
+    const gos = (globalOrder.status || "").toLowerCase();
+    const inProcessStates = [
+      "preparing to ship",
+      "preparing to deliver",
+      "processing",
+      "packed",
+      "shipped",
+      "in transit",
+      "out for delivery"
+    ];
+    const fulfilledStates = ["delivered", "fulfilled", "completed"];
+
+    if (fulfilledStates.includes(gos)) {
+      return { label: "Fulfilled", kind: "fulfilled" };
+    }
+    if (inProcessStates.includes(gos)) {
+      return { label: "In Process", kind: "process" };
+    }
+    // Fallback once signed but no mapped state
+    return { label: "In Process", kind: "process" };
+  }
+
+  return { label: st.charAt(0).toUpperCase() + st.slice(1), kind: "neutral" };
+}
+
 async function loadOffers(uid) {
   tableBody.innerHTML = "";
   const offersSnap = await getDocs(collection(db, "users", uid, "offers"));
@@ -89,17 +148,18 @@ async function loadOffers(uid) {
       }
     }
 
-    // --- Find related global order ---
-    let orderStatus = "-";
+    // --- Related global order (to derive pipeline status) ---
+    let globalOrder = null;
     let globalOrderId = offer.globalOrderId || null;
     if (globalOrderId) {
       const globalOrderRef = doc(db, "globalOrders", globalOrderId);
       const globalOrderSnap = await getDoc(globalOrderRef);
       if (globalOrderSnap.exists()) {
-        const globalOrder = globalOrderSnap.data();
-        orderStatus = globalOrder.status || "-";
+        globalOrder = globalOrderSnap.data();
       }
     }
+
+    const pipeline = derivePipelineStatus(offer, globalOrder);
 
     // --- Make orderId clickable if exists ---
     let orderStatusCell = globalOrderId
@@ -112,11 +172,7 @@ async function loadOffers(uid) {
         <td>${itemName}</td>
         <td>₹${offer.price}</td>
         <td>${offer.details}</td>
-        <td>
-          <span class="offer-status ${offer.status}">
-            ${offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
-          </span>
-        </td>
+        <td>${badge(pipeline.label, pipeline.kind)}</td>
         <td>${orderStatusCell}</td>
         <td>${date.toLocaleString()}</td>
       </tr>
@@ -335,19 +391,39 @@ ${supplier?.sig ?? "-"}`;
       updateStatusBtn.onclick = async () => {
         const newStatus = statusSelect.value;
         if (!newStatus) return;
-        await updateDoc(doc(db, "globalOrders", globalOrderId), { status: newStatus });
+
+        // 1) Update global order status
+        const globalOrderRef = doc(db, "globalOrders", globalOrderId);
+        await updateDoc(globalOrderRef, { status: newStatus });
+
+        // 2) Append tracking to global order
         const trackingUpdate = {
           date: new Date().toISOString(),
           status: newStatus,
           note: `${isSupplier ? "Supplier" : "Dealer"} updated status.`
         };
-        const globalOrderRef = doc(db, "globalOrders", globalOrderId);
         const globalOrderSnap = await getDoc(globalOrderRef);
         if (globalOrderSnap.exists()) {
           const orderData = globalOrderSnap.data();
           const trackingArr = orderData.tracking || [];
           trackingArr.push(trackingUpdate);
           await updateDoc(globalOrderRef, { tracking: trackingArr });
+
+          // 3) Propagate status to every user's orders doc referencing this global order
+          const ordersCg = query(collectionGroup(db, "orders"), where("globalOrderId", "==", globalOrderId));
+          const ordersCgSnap = await getDocs(ordersCg);
+          for (const s of ordersCgSnap.docs) {
+            await updateDoc(s.ref, { status: newStatus });
+          }
+
+          // 4) Propagate to supplier's orderFulfilment docs (if present)
+          const fulfilCg = query(collectionGroup(db, "orderFulfilment"), where("globalOrderId", "==", globalOrderId));
+          const fulfilCgSnap = await getDocs(fulfilCg);
+          for (const f of fulfilCgSnap.docs) {
+            await updateDoc(f.ref, { status: newStatus });
+          }
+
+          // 5) Notify parties
           if (orderData.dealerUid) {
             await createNotification(orderData.dealerUid, {
               type: "order_status",
@@ -365,6 +441,7 @@ ${supplier?.sig ?? "-"}`;
             });
           }
         }
+
         showToast('Order status updated!');
         document.getElementById('order-tracking-popup').remove();
         window.UpdateTracking(uid, globalOrderId); // Refresh popup
