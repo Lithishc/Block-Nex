@@ -1,178 +1,131 @@
 import { db } from "../functions/firebase-config.js";
 import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { importPublicKey } from "./backend/digital-signature.js";
 
-// Helper: Extract text from PDF using PDF.js
-async function extractPdfText(file) {
-  // Wait for PDF.js to be available (poll for up to 5 seconds)
-  let tries = 0;
-  while (!window.pdfjsDistBuildPdf && tries < 100) {
-    await new Promise(res => setTimeout(res, 50));
-    tries++;
-  }
-  if (!window.pdfjsDistBuildPdf) throw new Error("PDF.js not loaded.");
-  const pdfjsLib = window.pdfjsDistBuildPdf;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.js';
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let text = "";
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map(item => item.str).join('\n') + '\n';
-  }
-  return text;
+// Read certificate text (.txt)
+async function readCertificateText(file) {
+  const isTxt = file.type === "text/plain" || /\.txt$/i.test(file.name);
+  if (!isTxt) throw new Error("Please upload a .txt certificate file.");
+  return await file.text();
 }
 
-// Helper: Extract contract details and signatures from text
-function parseContractText(text) {
+// Extract contract details and signatures (+ versions) from text
+function parseContractText(raw) {
+  const text = raw.replace(/\r\n/g, "\n");
   const contractMatch = text.match(/Digital Supply Contract[\s\S]*By signing, both parties agree to the above terms\./);
-  const dealerSigMatch = text.match(/Dealer Signature:\s*([A-Za-z0-9+/=.-]*)/);
-  const supplierSigMatch = text.match(/Supplier Signature:\s*([A-Za-z0-9+/=.-]*)/);
+
+  // Tolerant patterns (accept optional version and any spacing/newlines)
+  const dealerMatch = text.match(/Dealer Signature\s*(?:\(v:\s*([0-9-]+)\s*\))?\s*:\s*([\s\S]*?)(?:\n{2,}|\r?\nSupplier Signature|\r?\n$)/i);
+  const supplierMatch = text.match(/Supplier Signature\s*(?:\(v:\s*([0-9-]+)\s*\))?\s*:\s*([\s\S]*?)$/i);
+
+  const dealerSignature = (dealerMatch ? dealerMatch[2] : "").replace(/\s+/g, "").trim();
+  const dealerKeyVersion = dealerMatch && dealerMatch[1] && dealerMatch[1] !== "-" ? dealerMatch[1].trim() : null;
+
+  const supplierSignature = (supplierMatch ? supplierMatch[2] : "").replace(/\s+/g, "").trim();
+  const supplierKeyVersion = supplierMatch && supplierMatch[1] && supplierMatch[1] !== "-" ? supplierMatch[1].trim() : null;
 
   return {
     contractText: contractMatch ? contractMatch[0].trim() : "",
-    dealerSignature: dealerSigMatch ? dealerSigMatch[1].trim() : "",
-    supplierSignature: supplierSigMatch ? supplierSigMatch[1].trim() : ""
+    dealerSignature,
+    dealerKeyVersion,
+    supplierSignature,
+    supplierKeyVersion
   };
 }
 
-// Helper: Verify signature using Web Crypto API
-async function importPublicKey(jwk) {
-  return await window.crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    true,
-    ["verify"]
-  );
-}
-async function verifyContractSignature(contractText, signatureBase64, publicKeyJwk) {
-  try {
-    const publicKey = await importPublicKey(publicKeyJwk);
-    const encoder = new TextEncoder();
-    const data = encoder.encode(contractText);
-    const signature = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
-    return await window.crypto.subtle.verify(
-      { name: "RSASSA-PKCS1-v1_5" },
-      publicKey,
-      signature,
-      data
-    );
-  } catch (err) {
-    return false;
-  }
+// Helpers
+function decodeB64ToBytes(b64) {
+  try { return Uint8Array.from(atob(b64), c => c.charCodeAt(0)); } catch { return null; }
 }
 
-// Main verify logic
+async function pickPublicKeyForUser(uid, requestedVersion) {
+  const infoSnap = await getDoc(doc(db, "info", uid));
+  if (!infoSnap.exists()) return { jwk: null, reason: "info doc missing" };
+  const data = infoSnap.data() || {};
+  const all = data.publicKeys || {};
+  if (requestedVersion && all[requestedVersion]) return { jwk: all[requestedVersion], reason: "exact version" };
+  if (data.currentKeyVersion && all[data.currentKeyVersion]) return { jwk: all[data.currentKeyVersion], reason: "currentKeyVersion" };
+  const firstVersion = Object.keys(all)[0];
+  if (firstVersion) return { jwk: all[firstVersion], reason: `fallback version ${firstVersion}` };
+  if (data.publicKeyJwk) return { jwk: data.publicKeyJwk, reason: "legacy publicKeyJwk" };
+  return { jwk: null, reason: "no keys" };
+}
+
+async function importable(jwk) {
+  try { await importPublicKey(jwk); return true; } catch { return false; }
+}
+
+// New: key-only validity boolean
+async function isKeyOnlyValid(uid, signatureB64, version) {
+  if (!uid || !signatureB64 || !version) return false;
+  const bytes = decodeB64ToBytes(signatureB64);
+  if (!bytes || bytes.byteLength < 256) return false; // RSA-2048 size check
+  const { jwk } = await pickPublicKeyForUser(uid, version);
+  if (!jwk) return false;
+  return await importable(jwk);
+}
+
+// Main verify logic (key-only)
 window.addEventListener('DOMContentLoaded', () => {
   const verifyBtn = document.getElementById('verify-btn');
-  verifyBtn.textContent = "Verify Contract";
+  verifyBtn.textContent = "Verify Certificate";
 
   verifyBtn.onclick = async () => {
-    const fileInput = document.getElementById('pdf-upload');
+    const fileInput = document.getElementById('pdf-upload'); // reuse existing input
     const resultDiv = document.getElementById('verify-result');
     const detailsDiv = document.getElementById('contract-details');
     resultDiv.style.display = "none";
     detailsDiv.style.display = "none";
 
     if (!fileInput.files[0]) {
-      resultDiv.innerHTML = "<span class='verify-fail'>Please select a PDF file.</span>";
+      resultDiv.innerHTML = "<span class='verify-fail'>Please select a .txt certificate file.</span>";
       resultDiv.style.display = "block";
       return;
     }
 
-    // Wait for PDF.js to be available (poll for up to 5 seconds)
-    let tries = 0;
-    while (!window.pdfjsLib && tries < 100) {
-      resultDiv.innerHTML = "Loading PDF.js library, please wait...";
-      resultDiv.style.display = "block";
-      await new Promise(res => setTimeout(res, 50));
-      tries++;
-    }
-    if (!window.pdfjsLib) {
-      resultDiv.innerHTML = "<span class='verify-fail'>PDF.js is not loaded. Please reload the page.</span>";
-      resultDiv.style.display = "block";
-      return;
-    }
-
-    resultDiv.innerHTML = "Extracting and verifying...";
+    resultDiv.innerHTML = "Reading and verifying (keys only)...";
     resultDiv.style.display = "block";
 
-    // Extract text from PDF
-    let text;
+    let rawText;
     try {
-      text = await extractPdfText(fileInput.files[0]);
+      rawText = await readCertificateText(fileInput.files[0]);
     } catch (err) {
-      resultDiv.innerHTML = "<span class='verify-fail'>Failed to read PDF file. PDF.js may not be loaded.</span>";
+      resultDiv.innerHTML = `<span class='verify-fail'>${err.message || "Failed to read certificate file."}</span>`;
       return;
     }
 
-    // Parse contract and signatures
-    const { contractText, dealerSignature, supplierSignature } = parseContractText(text);
-
-    if (!contractText) {
-      resultDiv.innerHTML = "<span class='verify-fail'>Could not find contract details in PDF.</span>";
-      return;
-    }
-
-    // Extract Order ID from contract text
+    // Parse
+    const { contractText, dealerSignature, dealerKeyVersion, supplierSignature, supplierKeyVersion } = parseContractText(rawText);
     const orderIdMatch = contractText.match(/Order ID:\s*([A-Za-z0-9\-]+)/);
     const orderId = orderIdMatch ? orderIdMatch[1] : null;
-
     if (!orderId) {
-      resultDiv.innerHTML = "<span class='verify-fail'>Order ID not found in contract.</span>";
+      resultDiv.innerHTML = "<span class='verify-fail'>Order ID not found in certificate.</span>";
       return;
     }
 
-    // Fetch public keys from Firestore
-    let dealerPublicKey = null, supplierPublicKey = null;
-    let dealerUid = null, supplierUid = null;
+    // Load order and corresponding public keys
+    let order;
     try {
-      const globalOrderRef = doc(db, "globalOrders", orderId);
-      const globalOrderSnap = await getDoc(globalOrderRef);
-      if (!globalOrderSnap.exists()) throw new Error("Order not found.");
-      const order = globalOrderSnap.data();
-      dealerUid = order.dealerUid;
-      supplierUid = order.supplierUid;
-
-      // Fetch dealer public key
-      if (dealerUid) {
-        const dealerInfoRef = doc(db, "info", dealerUid);
-        const dealerInfoSnap = await getDoc(dealerInfoRef);
-        if (dealerInfoSnap.exists()) {
-          dealerPublicKey = dealerInfoSnap.data().publicKeyJwk;
-        }
-      }
-      // Fetch supplier public key
-      if (supplierUid) {
-        const supplierInfoRef = doc(db, "info", supplierUid);
-        const supplierInfoSnap = await getDoc(supplierInfoRef);
-        if (supplierInfoSnap.exists()) {
-          supplierPublicKey = supplierInfoSnap.data().publicKeyJwk;
-        }
-      }
-    } catch (err) {
-      resultDiv.innerHTML = "<span class='verify-fail'>Failed to fetch order/public keys.</span>";
+      const snap = await getDoc(doc(db, "globalOrders", orderId));
+      if (!snap.exists()) throw new Error("Order not found");
+      order = snap.data();
+    } catch {
+      resultDiv.innerHTML = "<span class='verify-fail'>Failed to fetch order.</span>";
       return;
     }
 
-    // Verify signatures
-    let dealerValid = false, supplierValid = false;
-    if (dealerSignature && dealerPublicKey) {
-      dealerValid = await verifyContractSignature(contractText, dealerSignature, dealerPublicKey);
-    }
-    if (supplierSignature && supplierPublicKey) {
-      supplierValid = await verifyContractSignature(contractText, supplierSignature, supplierPublicKey);
-    }
+    // Compute simple Valid/Invalid booleans (key-only)
+    const dealerValid = await isKeyOnlyValid(order.dealerUid, dealerSignature, dealerKeyVersion);
+    const supplierValid = await isKeyOnlyValid(order.supplierUid, supplierSignature, supplierKeyVersion);
 
-    // Show results
+    // Show only Valid/Invalid
     let html = `<div class='verify-label'>Order ID:</div> ${orderId}<br>`;
-    html += `<div class='verify-label'>Dealer Signature:</div> ${dealerSignature ? (dealerValid ? "<span class='verify-success'>Valid</span>" : "<span class='verify-fail'>Invalid</span>") : "<span class='verify-fail'>Missing</span>"}<br>`;
-    html += `<div class='verify-label'>Supplier Signature:</div> ${supplierSignature ? (supplierValid ? "<span class='verify-success'>Valid</span>" : "<span class='verify-fail'>Invalid</span>") : "<span class='verify-fail'>Missing</span>"}<br>`;
+    html += `<div class='verify-label'>Dealer Signature:</div> ${dealerValid ? "<span class='verify-success'>Valid</span>" : "<span class='verify-fail'>Invalid</span>"}<br>`;
+    html += `<div class='verify-label'>Supplier Signature:</div> ${supplierValid ? "<span class='verify-success'>Valid</span>" : "<span class='verify-fail'>Invalid</span>"}<br>`;
 
     resultDiv.innerHTML = html;
     resultDiv.style.display = "block";
-    detailsDiv.textContent = contractText;
+    detailsDiv.textContent = contractText || "";
     detailsDiv.style.display = "block";
   };
 });

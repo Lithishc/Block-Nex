@@ -2,6 +2,7 @@ import { auth, db } from "../../functions/firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { collection, getDocs, doc, updateDoc, getDoc, setDoc, query, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
+import { signWithNewKey, downloadText } from "./digital-signature.js";
 
 // Digital contract helpers
 async function getSupplierGSTIN(supplierUid) {
@@ -14,94 +15,42 @@ async function getSupplierGSTIN(supplierUid) {
 }
 
 function generateContractText(order, dealerGSTIN, supplierGSTIN) {
-  return `Digital Supply Contract\n\nOrder ID: ${order.globalOrderId || "-"}\nItem: ${order.itemName}\nQuantity: ${order.quantity}\nSupplier: ${order.supplier}\nSupplier GSTIN: ${supplierGSTIN}\nDealer GSTIN: ${dealerGSTIN}\nPrice: Rs.${order.price}\nDetails: ${order.details}\nDate: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}\n\nBy signing, both parties agree to the above terms.`;
+  return `Digital Supply Contract
+
+Order ID: ${order.globalOrderId || "-"}
+Item: ${order.itemName}
+Quantity: ${order.quantity}
+Supplier: ${order.supplier}
+Supplier GSTIN: ${supplierGSTIN}
+Dealer GSTIN: ${dealerGSTIN}
+Price: Rs.${order.price}
+Details: ${order.details}
+Date: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}
+
+By signing, both parties agree to the above terms.`;
 }
 
-async function saveContractSignature(globalOrderId, who, signature) {
+async function saveContractSignature(globalOrderId, who, signaturePayload) {
   try {
     const globalOrderRef = doc(db, "globalOrders", globalOrderId);
-    await updateDoc(globalOrderRef, { [`contractSignatures.${who}`]: signature });
+    await updateDoc(globalOrderRef, { [`contractSignatures.${who}`]: signaturePayload });
 
     const ordersQuery = query(collectionGroup(db, "orders"), where("globalOrderId", "==", globalOrderId));
     const ordersSnap = await getDocs(ordersQuery);
     for (const docSnap of ordersSnap.docs) {
-      await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
+      await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signaturePayload });
     }
 
     const fulfilQuery = query(collectionGroup(db, "orderFulfilment"), where("globalOrderId", "==", globalOrderId));
     const fulfilSnap = await getDocs(fulfilQuery);
     for (const docSnap of fulfilSnap.docs) {
-      await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signature });
+      await updateDoc(docSnap.ref, { [`contractSignatures.${who}`]: signaturePayload });
     }
     return true;
   } catch (err) {
     console.error("saveContractSignature error:", err);
     return false;
   }
-}
-
-function downloadCertificate(filename, text) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  // Title
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text('Digital Supply Contract Certificate', 105, 20, { align: 'center' });
-
-  // Subtitle
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(15);
-  doc.text('Digital Supply Contract', 20, 32);
-
-  // Use Times font for contract details to support ₹ symbol
-  doc.setFont('times', 'normal');
-  doc.setFontSize(12);
-  let y = 42;
-  const contractLines = text.split('\n');
-  for (let line of contractLines) {
-    // Stop before signatures
-    if (line.startsWith('Dealer Signature:') || line.startsWith('Supplier Signature:')) break;
-    doc.text(line, 20, y, { align: 'left' });
-    y += 7;
-  }
-
-  // Add a gap before signatures
-  y += 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('Signatures:', 20, y);
-  y += 9;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(12);
-
-  // Extract and wrap signatures
-  const dealerSig = text.match(/Dealer Signature: (.*)/)?.[1] || "-";
-  const supplierSig = text.match(/Supplier Signature: (.*)/)?.[1] || "-";
-
-  // Dealer Signature
-  doc.setFont('helvetica', 'bold');
-  doc.text('Dealer Signature:', 20, y);
-  doc.setFont('helvetica', 'normal');
-  y += 7;
-  const dealerSigLines = doc.splitTextToSize(dealerSig, 170);
-  dealerSigLines.forEach(line => {
-    doc.text(line, 24, y);
-    y += 7;
-  });
-
-  y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Supplier Signature:', 20, y);
-  doc.setFont('helvetica', 'normal');
-  y += 7;
-  const supplierSigLines = doc.splitTextToSize(supplierSig, 170);
-  supplierSigLines.forEach(line => {
-    doc.text(line, 24, y);
-    y += 7;
-  });
-
-  doc.save(filename.replace('.txt', '.pdf'));
 }
 
 const tableBody = document.querySelector('#orders-table tbody');
@@ -163,7 +112,7 @@ window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId
   for (const globalDoc of globalSnap.docs) {
     await updateDoc(doc(db, "globalProcurementRequests", globalDoc.id), {
       fulfilled: true,
-      status: "completed",         // <-- set status to completed so UI treats it as closed
+      status: "completed",
       completedAt: new Date()
     });
   }
@@ -178,7 +127,7 @@ window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId
   for (const userDoc of userReqSnap.docs) {
     await updateDoc(doc(db, "users", uid, "procurementRequests", userDoc.id), {
       fulfilled: true,
-      status: "completed",        // <-- important: move from "ordered" -> "completed"
+      status: "completed",
       completedAt: new Date()
     });
     itemID = userDoc.data().itemID || itemID;
@@ -229,13 +178,11 @@ window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId
 };
 
 window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
-  // Fetch order from globalOrders
   const globalOrderRef = doc(db, "globalOrders", globalOrderId);
   const globalOrderSnap = await getDoc(globalOrderRef);
   if (!globalOrderSnap.exists()) return;
   const order = globalOrderSnap.data();
 
-  // Fetch tracking from globalOrders
   let tracking = order.tracking || [];
   let status = order.status;
 
@@ -262,8 +209,8 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
   }
 
   contractText = generateContractText(order, dealerGSTIN, supplierGSTIN);
-  dealerSigned = !!(contractSignatures && contractSignatures.dealer);
-  supplierSigned = !!(contractSignatures && contractSignatures.supplier);
+  dealerSigned = !!(contractSignatures && contractSignatures.dealer && contractSignatures.dealer.sig);
+  supplierSigned = !!(contractSignatures && contractSignatures.supplier && contractSignatures.supplier.sig);
 
   // Dealer signs first, then supplier
   if (isDealer && !dealerSigned) {
@@ -285,7 +232,7 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
       </div>
       <div style="margin:8px 0 0 0;">
         ${canSign ? `<button id="sign-contract-btn" class="pill-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
-        ${canDownload ? `<button id="download-contract-btn">Download Certificate</button>` : ""}
+        ${canDownload ? `<button id="download-contract-btn">Download Certificate (.txt)</button>` : ""}
       </div>
       <div style="color:#e0103a;font-size:0.95em;margin-top:6px;">
         ${!dealerSigned ? "Dealer must sign first." : (!supplierSigned && isSupplier ? "Please sign to proceed." : "")}
@@ -348,18 +295,18 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
     const downloadBtn = document.getElementById('download-contract-btn');
     if (signBtn) {
       signBtn.onclick = async () => {
-        // --- NEW: True Digital Signature ---
         const currentUid = auth.currentUser?.uid || uid;
         if (!currentUid) {
           alert("User not found. Please login again.");
           return;
         }
-        const { privateKeyJwk } = await ensureUserKeys(currentUid);
-        let signature = await signContractText(contractText, privateKeyJwk);
+        // Sign with fresh keypair and store only public key (versioned)
+        const { signature, keyVersion } = await signWithNewKey(currentUid, contractText);
+        const payload = { v: keyVersion, sig: signature };
+
         if (isDealer) {
-          const success = await saveContractSignature(globalOrderId, 'dealer', signature);
+          const success = await saveContractSignature(globalOrderId, 'dealer', payload);
           if (success) {
-            // Notify supplier to sign
             if (order.supplierUid) {
               await createNotification(order.supplierUid, {
                 type: "contract_sign",
@@ -368,13 +315,11 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
                 related: { globalOrderId }
               });
             }
-            // Refresh UI
             window.showTracking(uid, globalOrderId, globalProcurementId);
           }
         } else if (isSupplier) {
-          const success = await saveContractSignature(globalOrderId, 'supplier', signature);
+          const success = await saveContractSignature(globalOrderId, 'supplier', payload);
           if (success) {
-            // Notify dealer that supplier signed
             if (order.dealerUid) {
               await createNotification(order.dealerUid, {
                 type: "contract_sign",
@@ -383,132 +328,37 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
                 related: { globalOrderId }
               });
             }
-            // Refresh UI
             window.showTracking(uid, globalOrderId, globalProcurementId);
           }
         }
       };
     }
     if (downloadBtn) {
-      downloadBtn.onclick = () => {
-        let certText = contractText + `\n\nDealer Signature: ${contractSignatures.dealer || "-"}\nSupplier Signature: ${contractSignatures.supplier || "-"}`;
-        downloadCertificate(`Order_${globalOrderId}_Certificate.txt`, certText);
+      downloadBtn.onclick = async () => {
+        try {
+          // Always fetch the latest signatures before downloading
+          const latestSnap = await getDoc(doc(db, "globalOrders", globalOrderId));
+          const latest = latestSnap.exists() ? latestSnap.data() : order;
+          const sigs = latest.contractSignatures || {};
+          const dealer = sigs.dealer || null;
+          const supplier = sigs.supplier || null;
+
+          const certText =
+            contractText +
+            `
+
+Dealer Signature (v:${dealer?.v ?? "-" }):
+${dealer?.sig ?? "-"}
+
+Supplier Signature (v:${supplier?.v ?? "-" }):
+${supplier?.sig ?? "-"}`;
+
+          downloadText(`Order_${globalOrderId}_Certificate.txt`, certText);
+        } catch (e) {
+          console.error("Download certificate failed", e);
+          alert("Could not fetch latest signatures. Please refresh and try again.");
+        }
       };
     }
   }, 100);
 };
-
-// --- Digital Signature Helpers (Web Crypto API) ---
-async function importPublicKey(jwk) {
-  return await window.crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    true,
-    ["verify"]
-  );
-}
-async function importPrivateKey(jwk) {
-  return await window.crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    true,
-    ["sign"]
-  );
-}
-async function signContractText(contractText, privateKeyJwk) {
-  const privateKey = await importPrivateKey(privateKeyJwk);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(contractText);
-  const signature = await window.crypto.subtle.sign(
-    { name: "RSASSA-PKCS1-v1_5" },
-    privateKey,
-    data
-  );
-  return btoa(String.fromCharCode(...new Uint8Array(signature)));
-}
-async function verifyContractSignature(contractText, signatureBase64, publicKeyJwk) {
-  const publicKey = await importPublicKey(publicKeyJwk);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(contractText);
-  const signature = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
-  return await window.crypto.subtle.verify(
-    { name: "RSASSA-PKCS1-v1_5" },
-    publicKey,
-    signature,
-    data
-  );
-}
-
-// Generate a new key pair and store them
-async function generateAndStoreKeyPair() {
-  const keyPair = await window.crypto.subtle.generateKey(
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      modulusLength: 2048,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: "SHA-256"
-    },
-    true,
-    collectionGroup(db, "orders"),
-    where("globalOrderId", "==", globalOrderId)
-  );
-  const ordersSnap = await getDocs(ordersQuery);
-  for (const docSnap of ordersSnap.docs) {
-    await updateDoc(docSnap.ref, {
-      status: globalOrder.status,
-      tracking: globalOrder.tracking
-    });
-  }
-
-  // Also update supplier's orderFulfilment if you use it
-  const fulfilQuery = query(
-    collectionGroup(db, "orderFulfilment"),
-    where("globalOrderId", "==", globalOrderId)
-  );
-  const fulfilSnap = await getDocs(fulfilQuery);
-  for (const docSnap of fulfilSnap.docs) {
-    await updateDoc(docSnap.ref, {
-      status: globalOrder.status,
-      tracking: globalOrder.tracking
-    });
-  }
-}
-
-// ensure keypair helper (private stored locally, public stored in Firestore info/{uid})
-async function ensureUserKeys(uid) {
-  let privateKeyJwk = null;
-  let publicKeyJwk = null;
-  try {
-    privateKeyJwk = JSON.parse(localStorage.getItem(`privateKeyJwk_${uid}`) || "null");
-    publicKeyJwk = JSON.parse(localStorage.getItem(`publicKeyJwk_${uid}`) || "null");
-    if (privateKeyJwk && publicKeyJwk) return { privateKeyJwk, publicKeyJwk };
-
-    // Generate new keypair
-    const keyPair = await window.crypto.subtle.generateKey(
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        modulusLength: 2048,
-        publicExponent: new Uint8Array([1, 0, 1]),
-        hash: "SHA-256"
-      },
-      true,
-      ["sign", "verify"]
-    );
-    privateKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
-    publicKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
-
-    // Store locally with UID
-    localStorage.setItem(`privateKeyJwk_${uid}`, JSON.stringify(privateKeyJwk));
-    localStorage.setItem(`publicKeyJwk_${uid}`, JSON.stringify(publicKeyJwk));
-
-    // Store public key in Firestore
-    await updateDoc(doc(db, "info", uid), { publicKeyJwk: publicKeyJwk });
-
-    return { privateKeyJwk, publicKeyJwk };
-  } catch (err) {
-    console.error("ensureUserKeys error:", err);
-    throw err;
-  }
-}
