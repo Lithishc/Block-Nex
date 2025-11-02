@@ -1,4 +1,4 @@
-import { auth, db } from "../../functions/firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import {
   doc, getDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
@@ -26,7 +26,7 @@ let originalData = {};
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     alert("Please login to view your profile.");
-    window.location.href = "../frontend/login.html";
+    window.location.href = "./login.html";
     return;
   }
 

@@ -1,12 +1,12 @@
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { app } from "../../functions/firebase-config.js"; 
+import { app } from "./firebase-config.js"; 
 
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 export function loadNavbar() {
-  fetch('../frontend/navbar.html')
+  fetch('./navbar.html')
     .then(response => response.text())
     .then(data => {
       document.getElementById('navbar-placeholder').innerHTML = data;
@@ -67,7 +67,7 @@ export function loadNavbar() {
           e.preventDefault();
           await signOut(auth);
           localStorage.removeItem("navbarUsername"); // Clear cache on logout
-          window.location.href = "../frontend/index.html";
+          window.location.href = "./index.html";
         });
       }
 

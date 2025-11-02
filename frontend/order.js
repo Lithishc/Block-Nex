@@ -1,4 +1,4 @@
-import { auth, db } from "../../functions/firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { collection, getDocs, doc, updateDoc, getDoc, setDoc, query, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
@@ -58,7 +58,7 @@ const tableBody = document.querySelector('#orders-table tbody');
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     alert("Please login to view orders.");
-    window.location.href = "../frontend/index.html";
+    window.location.href = "./index.html";
     return;
   }
   loadOrders(user.uid);

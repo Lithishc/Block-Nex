@@ -1,4 +1,4 @@
-import { db } from "../../functions/firebase-config.js";
+import { db } from ".//firebase-config.js";
 import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
 // Canonicalize text to avoid newline/whitespace mismatches

@@ -1,4 +1,4 @@
-import { auth } from "../../functions/firebase-config.js";
+import { auth } from "./firebase-config.js";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
@@ -40,7 +40,7 @@ loginForm.addEventListener("submit", async (e) => {
         }
 
         // Redirect all users to the same dashboard
-        window.location.href = "../frontend/dashboard.html";
+        window.location.href = "./dashboard.html";
     } catch (error) {
         errorMessage.textContent = "Invalid email or password.";
         console.error("Login error:", error);
@@ -66,6 +66,6 @@ forgotPasswordLink.addEventListener("click", async (e) => {
 // Redirect to Register Page
 createAccountLink.addEventListener("click", (e) => {
     e.preventDefault();
-    window.location.href = "../frontend/registry.html";
+    window.location.href = "./registry.html";
 });
 

@@ -1,6 +1,6 @@
-import { db } from "../functions/firebase-config.js";
+import { db } from "./firebase-config.js";
 import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { importPublicKey } from "./backend/digital-signature.js";
+import { importPublicKey } from "./digital-signature.js";
 
 // Read certificate text (.txt)
 async function readCertificateText(file) {
