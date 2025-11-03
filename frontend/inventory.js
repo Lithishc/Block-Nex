@@ -1,10 +1,11 @@
 // Import Firebase modules from your config and Firestore functions from CDN
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, getDoc, query, where, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, getDoc, query, where, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
 import { generateStandardId } from "./id-utils.js";
+import { createRestockOnChain } from "./functions/blockchain.js";
 
 
 // DOM Elements
@@ -205,7 +206,7 @@ async function loadInventory(uid) {
           if (reqSnap.empty) {
             const qtyToRequest = requestQty > 0 ? requestQty : presetQty;
 
-            // NEW: read dealer company/location from Supplier Details (info/{uid})
+            // Read company/location (unchanged)
             let dealerCompanyName = "";
             let dealerAddress = "";
             let dealerLocation = "";
@@ -222,6 +223,21 @@ async function loadInventory(uid) {
               console.warn("Supplier details not found:", err);
             }
 
+            // 1) Create on-chain procurement first
+            let chain;
+            try {
+              chain = await createRestockOnChain({
+                dealerUid: auth.currentUser.uid,
+                skuId: item.itemID,
+                qty: qtyToRequest
+              });
+            } catch (e) {
+              console.error("Blockchain procurement failed:", e);
+              showToast("Blockchain create failed. Try again.", "error");
+              return;
+            }
+
+            // 2) Firestore docs with blockchain IDs/hashes
             const requestData = {
               itemID: item.itemID,
               itemName: item.itemName,
@@ -234,15 +250,25 @@ async function loadInventory(uid) {
               dealerAddress,
               location: dealerLocation || dealerAddress || "",
               createdAt: new Date(),
-              fulfilled: false
+              fulfilled: false,
+              blockchain: {
+                procurementId: chain.procurementId,
+                txHash: chain.txHash,
+                network: "sepolia"
+              }
             };
 
-            // Use friendly id instead of Firestore auto-id
             const newGlobalProcId = generateStandardId("procurement");
-            await setDoc(doc(db, "globalProcurementRequests", newGlobalProcId), { ...requestData, globalProcurementId: newGlobalProcId });
+            await setDoc(doc(db, "globalProcurementRequests", newGlobalProcId), {
+              ...requestData,
+              globalProcurementId: newGlobalProcId
+            });
 
-            // Create user procurement doc with same id (for traceability) and set requestId
-            await setDoc(doc(db, "users", auth.currentUser.uid, "procurementRequests", newGlobalProcId), { ...requestData, globalProcurementId: newGlobalProcId, requestId: newGlobalProcId });
+            await setDoc(doc(db, "users", auth.currentUser.uid, "procurementRequests", newGlobalProcId), {
+              ...requestData,
+              globalProcurementId: newGlobalProcId,
+              requestId: newGlobalProcId
+            });
 
             await createNotification(auth.currentUser.uid, {
               type: "procurement_created",
@@ -250,7 +276,7 @@ async function loadInventory(uid) {
               body: `${requestData.itemName} • Qty ${requestData.requestedQty}`,
               related: { globalProcurementId: newGlobalProcId, itemID: requestData.itemID }
             });
-            showToast("Procurement request created", "success");
+            showToast("Procurement created on-chain", "success");
           }
         }
       }

@@ -1,9 +1,10 @@
-import { db } from "../functions/firebase-config.js";
+import { db } from "./firebase-config.js";
 import {collection, getDocs, doc, updateDoc, arrayUnion, getDoc, query, where, addDoc, setDoc} from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
 import { generateStandardId } from "./id-utils.js";
+import { submitOnChainOffer, acceptOnChainOffer } from "./functions/blockchain.js";
 
 const auth = getAuth();
 
@@ -165,75 +166,99 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('offer-form').addEventListener('submit', async function (e) {
   e.preventDefault();
   const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]') || form.querySelector('button');
 
-  const supplierName = form.supplierName.value;
-  const location = form.location.value;
-  const price = Number(form.price.value);
-  const details = form.details.value;
-  const paymentMethod = form.paymentMethod.value;
-  const paymentTerms = form.paymentTerms.value;
-  const deliveryMethod = form.deliveryMethod.value;
-  const deliveryDays = Number(form.deliveryDays.value);
+  if (form.dataset.submitting === "1") return;
+  form.dataset.submitting = "1";
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Sending…"; }
 
-  const supplierUid = auth.currentUser ? auth.currentUser.uid : null;
-  if (!supplierUid) {
-    alert("You must be logged in as a supplier to send an offer.");
-    return;
-  }
+  try {
+    const supplierName = form.supplierName.value;
+    const location = form.location.value;
+    const price = Number(form.price.value);
+    const details = form.details.value;
+    const paymentMethod = form.paymentMethod.value;
+    const paymentTerms = form.paymentTerms.value;
+    const deliveryMethod = form.deliveryMethod.value;
+    const deliveryDays = Number(form.deliveryDays.value);
 
-  const offerData = {
-    globalProcurementId: currentReqId,
-    supplierName,
-    location,
-    price,
-    details,
-    payment: { method: paymentMethod, terms: paymentTerms },
-    delivery: { method: deliveryMethod, days: deliveryDays },
-    supplierUid,
-    createdAt: new Date(),
-    status: "pending"
-  };
+    const supplierUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (!supplierUid) {
+      alert("You must be logged in as a supplier to send an offer.");
+      return;
+    }
 
-  // Use friendly offer id instead of Firestore auto-id
-  const offerId = generateStandardId("offer");
-  offerData.offerId = offerId;
-  await setDoc(doc(db, "users", supplierUid, "offers", offerId), offerData);
-
-  // Append into global request
-  const reqRef = doc(db, "globalProcurementRequests", currentReqId);
-  await updateDoc(reqRef, { supplierResponses: arrayUnion(offerData) });
-
-  // Append into request owner's user subcollection doc(s)
-  const reqSnap = await getDoc(reqRef);
-  if (reqSnap.exists()) {
+    // Guard: avoid duplicate offers from same supplier on same request (pending or accepted)
+    const reqRef = doc(db, "globalProcurementRequests", currentReqId);
+    const reqSnap = await getDoc(reqRef);
+    if (!reqSnap.exists()) throw new Error("Request not found");
     const reqData = reqSnap.data();
-    const userUid = reqData.userUid;
-    const globalProcurementId = reqSnap.id;
 
+    const procurementIdOnChain = Number(reqData?.blockchain?.procurementId || 0);
+    if (!procurementIdOnChain) throw new Error("Request has no blockchain procurementId.");
+
+    const existing = (reqData.supplierResponses || []).find(o => o?.supplierUid === supplierUid && o?.status !== "rejected");
+    if (existing) {
+      showToast("You already sent an offer for this request.", "info");
+      return;
+    }
+
+    // 1) On-chain (fast)
+    const chain = await submitOnChainOffer({
+      procurementId: procurementIdOnChain,
+      supplierUid,
+      price,
+      details
+    });
+
+    // 2) Firestore
+    const offerData = {
+      globalProcurementId: currentReqId,
+      supplierName, location, price, details,
+      payment: { method: paymentMethod, terms: paymentTerms },
+      delivery: { method: deliveryMethod, days: deliveryDays },
+      supplierUid,
+      createdAt: new Date(),
+      status: "pending",
+      blockchain: { offerId: chain.offerId, txHash: chain.txHash, network: "sepolia" }
+    };
+    const offerId = generateStandardId("offer");
+    offerData.offerId = offerId;
+
+    await setDoc(doc(db, "users", supplierUid, "offers", offerId), offerData);
+    await updateDoc(reqRef, { supplierResponses: arrayUnion(offerData) });
+
+    const dealerUid = reqData.userUid;
     const userReqQuery = query(
-      collection(db, "users", userUid, "procurementRequests"),
-      where("globalProcurementId", "==", globalProcurementId),
+      collection(db, "users", dealerUid, "procurementRequests"),
+      where("globalProcurementId", "==", currentReqId),
       where("status", "==", "open")
     );
     const userReqSnap = await getDocs(userReqQuery);
     for (const userDoc of userReqSnap.docs) {
       await updateDoc(
-        doc(db, "users", userUid, "procurementRequests", userDoc.id),
+        doc(db, "users", dealerUid, "procurementRequests", userDoc.id),
         { supplierResponses: arrayUnion(offerData) }
       );
     }
 
-    const dealerUid = reqData.userUid;
     await createNotification(dealerUid, {
       type: "offer_received",
       title: "New Offer Received",
       body: `${supplierName} offered ₹${price} for ${reqData.itemName}`,
       related: { globalProcurementId: currentReqId, offerId: offerData.offerId, itemID: reqData.itemID }
     });
+
+    showToast("Offer sent on-chain", "success");
+    window.closeOfferPopup();
+    loadOpenRequests(supplierUid);
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Blockchain offer failed", "error");
+  } finally {
+    delete form.dataset.submitting;
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Send Offer"; }
   }
-  showToast("Offer sent", "success");
-  window.closeOfferPopup();
-  loadOpenRequests(supplierUid);
 });
 
 document.getElementById('show-demand-btn').onclick = async function() {

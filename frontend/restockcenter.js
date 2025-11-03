@@ -3,9 +3,11 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/f
 import { collection, getDocs, doc, updateDoc, addDoc, query, where, getDoc, arrayUnion, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
-import { getSeasonalDemand } from "../functions/chatgpt-helper.js";
-import { getInventoryTrendPrediction } from "../functions/ml-inventory-trend.js";
+// FIX: frontend helper modules live under ./frontend/functions
+import { getSeasonalDemand } from "./chatgpt-helper.js";
+import { getInventoryTrendPrediction } from "./ml-inventory-trend.js";
 import { generateStandardId } from "./id-utils.js";
+// Removed: import { acceptRestockOnChain } from "./functions/blockchain.js";
 
 const tableBody = document.querySelector('#procurement-table tbody');
 
@@ -194,7 +196,7 @@ window.addEventListener('DOMContentLoaded', () => {
   setTimeout(annotateAIDemandTags, 600);
 });
 
-// popup or section to show offers (restored old UI but keep new logic)
+// popup with offers
 window.viewOffers = async (uid, globalProcurementId, userRequestId) => {
   const reqRef = doc(db, "globalProcurementRequests", globalProcurementId);
   const reqSnap = await getDoc(reqRef);
@@ -259,8 +261,12 @@ window.viewOffers = async (uid, globalProcurementId, userRequestId) => {
 
           <div style="display:flex;gap:12px;margin-top:10px;">
             ${ (canAct && offerPending) ? `
-              <button class="pill-btn accept" onclick="this.disabled=true; window.acceptOffer('${uid}','${globalProcurementId}','${userRequestId}',${idx})" style="background:#0b5ea8;color:#fff;border:none;padding:10px 16px;border-radius:24px;cursor:pointer;">Accept</button>
-              <button class="pill-btn reject" onclick="this.disabled=true; window.rejectOffer('${uid}','${globalProcurementId}','${userRequestId}',${idx})" style="background:#d9534f;color:#fff;border:none;padding:10px 16px;border-radius:24px;cursor:pointer;">Reject</button>
+              <button class="pill-btn accept"
+                      onclick="this.disabled=true; window.acceptOffer('${uid}','${globalProcurementId}','${userRequestId}',${idx})"
+                      style="background:#0b5ea8;color:#fff;border:none;padding:10px 16px;border-radius:24px;cursor:pointer;">Accept</button>
+              <button class="pill-btn reject"
+                      onclick="this.disabled=true; window.rejectOffer('${uid}','${globalProcurementId}','${userRequestId}',${idx})"
+                      style="background:#d9534f;color:#fff;border:none;padding:10px 16px;border-radius:24px;cursor:pointer;">Reject</button>
             ` : (status === "accepted" ? `<button disabled style="padding:10px 16px;border-radius:24px;background:#6aa84f;color:#fff;border:none;">Accepted</button>` :
                  status === "rejected" ? `<button disabled style="padding:10px 16px;border-radius:24px;background:#aaa;color:#fff;border:none;">Rejected</button>` :
                  `<button disabled style="padding:10px 16px;border-radius:24px;background:#ccc;color:#fff;border:none;">${currentStatus}</button>`)
@@ -289,135 +295,195 @@ window.viewOffers = async (uid, globalProcurementId, userRequestId) => {
 };
 
 
-// Accept supplier offer and create order for both dealer and supplier
+// Accept supplier offer, confirm on-chain, and create order docs (same schema as before)
 window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) => {
-  const globalReqRef = doc(db, "globalProcurementRequests", globalProcurementId);
-  const globalReqSnap = await getDoc(globalReqRef);
-  if (!globalReqSnap.exists()) return;
-  const currentGlobal = globalReqSnap.data();
-
-  // Guard: prevent double-accept / duplicate orders
-  if (currentGlobal.status === "ordered" || currentGlobal.accepted) {
-    showToast("An offer was already accepted for this request", "info");
-    return;
-  }
-
-  const reqData = currentGlobal;
-  const offers = reqData.supplierResponses || [];
-  if (!offers[offerIdx]) {
-    showToast("Offer not found", "error");
-    return;
-  }
-
-  // Update offer statuses
-  const updatedOffers = offers.map((offer, idx) => ({
-    ...offer,
-    status: idx === offerIdx ? "accepted" : (offer.status === "rejected" ? "rejected" : "rejected")
-  }));
-  const acceptedOffer = updatedOffers[offerIdx];
-
-  // Update status in global request (mark ordered first to prevent races)
-  await updateDoc(globalReqRef, {
-    status: "ordered",
-    acceptedOffer,
-    accepted: true,
-    supplierResponses: updatedOffers,
-    orderedAt: new Date()
-  });
-
-  // Update user's procurementRequests (mark ordered)
-  if (userRequestId) {
+  try {
+    // Load user's request for details
     const userReqRef = doc(db, "users", uid, "procurementRequests", userRequestId);
-    await updateDoc(userReqRef, {
+    const userReqSnap = await getDoc(userReqRef);
+    if (!userReqSnap.exists()) throw new Error("Request not found");
+    const userReq = userReqSnap.data();
+
+    // If already ordered, do nothing (idempotent)
+    if ((userReq.status === "ordered") && userReq.globalOrderId) {
+      showToast(`Already ordered: ${userReq.globalOrderId}`, "info");
+      return;
+    }
+
+    // Load global request (source of truth for offers)
+    const globalReqRef = doc(db, "globalProcurementRequests", globalProcurementId);
+    const globalReqSnap = await getDoc(globalReqRef);
+    if (!globalReqSnap.exists()) throw new Error("Global request not found");
+    const globalReq = globalReqSnap.data();
+    if (globalReq.status === "ordered" || globalReq.accepted) {
+      showToast("An offer was already accepted for this request", "info");
+      return;
+    }
+
+    const offer = (globalReq.supplierResponses || [])[offerIdx];
+    if (!offer) throw new Error("Offer not found");
+
+    // On-chain accept using IDs saved during create/offer
+    const procurementId = Number((userReq.blockchain || globalReq.blockchain || {}).procurementId || 0);
+    const offerIdOnChain = Number((offer.blockchain || {}).offerId || 0);
+    if (!procurementId || !offerIdOnChain) throw new Error("Missing blockchain IDs");
+
+    const r = await fetch("http://localhost:3000/api/bc/offers/accept?fast=1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ procurementId, offerId: offerIdOnChain, fast: 1 })
+    });
+    const j = await r.json();
+    if (!r.ok || !j.txHash) throw new Error(j.error || "Blockchain accept failed");
+
+    // Mark accepted and set others rejected
+    const updatedOffers = (globalReq.supplierResponses || []).map((o, i) =>
+      i === offerIdx
+        ? { ...o, status: "accepted", blockchain: { ...(o.blockchain || {}), acceptTx: j.txHash, network: "sepolia" } }
+        : { ...o, status: (o.status === "rejected" ? "rejected" : "rejected") }
+    );
+    const acceptedOffer = updatedOffers[offerIdx];
+
+    // Update global + user request documents
+    await updateDoc(globalReqRef, {
       status: "ordered",
-      acceptedOffer,
       accepted: true,
+      acceptedOfferIdx: offerIdx,
+      acceptedOffer,
       supplierResponses: updatedOffers,
       orderedAt: new Date()
     });
-  }
-
-  // Create global order and write its id back (use friendly id)
-  const newOrderId = generateStandardId("order");
-  await setDoc(doc(db, "globalOrders", newOrderId), {
-    globalOrderId: newOrderId,
-    dealerUid: uid,
-    supplierUid: acceptedOffer.supplierUid,
-    procurementId: userRequestId,
-    globalProcurementId,
-    offerId: acceptedOffer.offerId,
-    itemID: reqData.itemID,
-    itemName: reqData.itemName,
-    quantity: reqData.requestedQty,
-    supplier: acceptedOffer.supplierName,
-    price: acceptedOffer.price,
-    details: acceptedOffer.details,
-    status: "ordered",
-    tracking: [],
-    createdAt: new Date()
-  });
-  const globalOrderId = newOrderId;
-
-  // store globalOrderId into global request and user request so UI can show it
-  await updateDoc(globalReqRef, { globalOrderId });
-  if (userRequestId) await updateDoc(doc(db, "users", uid, "procurementRequests", userRequestId), { globalOrderId, orderId: globalOrderId });
-
-  // 2. Store reference in dealer's orders, using globalOrderId as the doc ID
-  await setDoc(doc(db, "users", uid, "orders", globalOrderId), {
-    globalOrderId,
-    ...reqData,
-    offerId: acceptedOffer.offerId,
-    supplier: acceptedOffer.supplierName,
-    price: acceptedOffer.price,
-    details: acceptedOffer.details,
-    status: "ordered",
-    createdAt: new Date(),
-    dealerUid: uid,
-    supplierUid: acceptedOffer.supplierUid
-  });
-
-  // 3. Store reference in supplier's orderFulfilment, using globalOrderId as the doc ID
-  if (acceptedOffer.supplierUid) {
-    await setDoc(doc(db, "users", acceptedOffer.supplierUid, "orderFulfilment", globalOrderId), {
-      globalOrderId,
-      ...reqData,
-      offerId: acceptedOffer.offerId,
-      dealer: uid,
-      price: acceptedOffer.price,
-      details: acceptedOffer.details,
+    await updateDoc(userReqRef, {
       status: "ordered",
-      createdAt: new Date(),
-      dealerUid: uid,
-      supplierUid: acceptedOffer.supplierUid
+      accepted: true,
+      acceptedOfferIdx: offerIdx,
+      supplierResponses: updatedOffers,
+      orderedAt: new Date(),
+      blockchain: { ...(userReq.blockchain || {}), procurementId } // keep
     });
+
+    // Build order doc (fields used by orders.js/offers.js)
+    const orderId = generateStandardId("order");
+    const qty = Number(userReq.requestedQty || userReq.presetQty || 0);
+    const priceNum = Number(acceptedOffer.price || 0);
+
+    // GSTINs (best effort)
+    let dealerGSTIN = "";
+    try { const inf = await getDoc(doc(db, "info", uid)); dealerGSTIN = inf.exists() ? (inf.data().gstNumber || "") : ""; } catch {}
+    let supplierGSTIN = "";
+    try {
+      if (acceptedOffer.supplierUid) {
+        const inf2 = await getDoc(doc(db, "info", acceptedOffer.supplierUid));
+        supplierGSTIN = inf2.exists() ? (inf2.data().gstNumber || "") : "";
+      }
+    } catch {}
+
+    const orderDoc = {
+      // IDs
+      globalOrderId: orderId,
+      procurementId: userReqId || userRequestId || null,
+      globalProcurementId,
+      offerId: acceptedOffer.offerId || null,
+
+      // Parties
+      dealerUid: uid,
+      supplierUid: acceptedOffer.supplierUid || null,
+
+      // Business fields
+      itemID: globalReq.itemID,
+      itemName: globalReq.itemName,
+      quantity: qty,
+      supplier: acceptedOffer.supplierName || "",         // legacy field
+      supplierName: acceptedOffer.supplierName || "",     // alt name if used
+      price: priceNum,                                    // legacy field
+      unitPrice: priceNum,                                // alt used by some UIs
+      totalPrice: isFinite(priceNum * qty) ? priceNum * qty : 0,
+      details: acceptedOffer.details || "",
+      payment: acceptedOffer.payment || null,
+      delivery: acceptedOffer.delivery || null,
+      status: "ordered",
+      tracking: [],
+      createdAt: new Date(),
+
+      // Contract/signatures
+      dealerGSTIN,
+      supplierGSTIN,
+      contractSignatures: {},
+
+      // For compatibility in supplier view
+      acceptedOffer: {
+        supplierUid: acceptedOffer.supplierUid || null,
+        offerId: acceptedOffer.offerId || null,
+        price: priceNum,
+        details: acceptedOffer.details || ""
+      },
+
+      // Blockchain refs
+      blockchain: {
+        network: "sepolia",
+        procurementId,
+        offerId: offerIdOnChain,
+        acceptTx: j.txHash
+      }
+    };
+
+    // Persist order globally and under both users (like before)
+    await setDoc(doc(db, "globalOrders", orderId), orderDoc, { merge: true });
+    await setDoc(doc(db, "users", uid, "orders", orderId), { ...orderDoc, role: "buyer" }, { merge: true });
+    if (acceptedOffer.supplierUid) {
+      await setDoc(doc(db, "users", acceptedOffer.supplierUid, "orders", orderId), { ...orderDoc, role: "supplier" }, { merge: true });
+      // supplier’s legacy location: orderFulfilment
+      await setDoc(doc(db, "users", acceptedOffer.supplierUid, "orderFulfilment", orderId), { ...orderDoc, role: "supplier" }, { merge: true });
+    }
+
+    // Back-links on requests
+    await updateDoc(globalReqRef, { globalOrderId: orderId });
+    await updateDoc(userReqRef, { globalOrderId: orderId, orderId });
+
+    // Update supplier’s offer doc with accept + order link
+    if (acceptedOffer.supplierUid && acceptedOffer.offerId) {
+      await updateDoc(doc(db, "users", acceptedOffer.supplierUid, "offers", acceptedOffer.offerId), {
+        status: "accepted",
+        globalOrderId: orderId,
+        blockchain: { ...(acceptedOffer.blockchain || {}), acceptTx: j.txHash, network: "sepolia" }
+      });
+    }
+
+    // Notifications
+    await createNotification(acceptedOffer.supplierUid, {
+      type: "offer_accepted",
+      title: "Offer Accepted",
+      body: `Your offer for ${globalReq.itemName} was accepted.`,
+      related: { globalProcurementId, offerId: acceptedOffer.offerId, globalOrderId: orderId, itemID: globalReq.itemID }
+    });
+    await createNotification(uid, {
+      type: "order_created",
+      title: "Order Created",
+      body: `${acceptedOffer.supplierName} supplying ${globalReq.itemName}.`,
+      related: { globalProcurementId, offerId: acceptedOffer.offerId, globalOrderId: orderId, itemID: globalReq.itemID }
+    });
+
+    showToast("Offer accepted on‑chain and order created", "success");
+
+    // Close popup and reload UI
+    const popup = document.getElementById('offers-popup');
+    if (popup) popup.remove();
+    loadInventoryForProcurement(uid);
+  } catch (e) {
+    console.error(e);
+    showToast(e.message || "Failed to accept", "error");
   }
-
-  // ensure supplier offer doc is updated to accepted and has globalOrderId
-  if (acceptedOffer.supplierUid && acceptedOffer.offerId) {
-    const supplierOfferRef = doc(db, "users", acceptedOffer.supplierUid, "offers", acceptedOffer.offerId);
-    await updateDoc(supplierOfferRef, { status: "accepted", globalOrderId });
-  }
-
-  // notifications & UI update
-  await createNotification(acceptedOffer.supplierUid, {
-    type: "offer_accepted",
-    title: "Offer Accepted",
-    body: `Your offer for ${reqData.itemName} was accepted.`,
-    related: { globalProcurementId, offerId: acceptedOffer.offerId, globalOrderId, itemID: reqData.itemID }
-  });
-  await createNotification(uid, {
-    type: "order_created",
-    title: "Order Created",
-    body: `${acceptedOffer.supplierName} supplying ${reqData.itemName}.`,
-    related: { globalProcurementId, offerId: acceptedOffer.offerId, globalOrderId, itemID: reqData.itemID }
-  });
-  showToast("Offer accepted & order created", "success");
-
-  // close popup and reload
-  const popup = document.getElementById('offers-popup');
-  if (popup) popup.remove();
-  loadInventoryForProcurement(uid);
 };
+
+// Minimal helper remains
+async function acceptRestock(restockId, acceptedByUid) {
+  try {
+    await updateDoc(doc(db, "globalProcurementRequests", String(restockId)), {
+      acceptedBy: acceptedByUid,
+      acceptedAt: new Date()
+    });
+  } catch {}
+}
 
 // Reject supplier offer
 window.rejectOffer = async (uid, globalProcurementId, userRequestId, offerIdx) => {
