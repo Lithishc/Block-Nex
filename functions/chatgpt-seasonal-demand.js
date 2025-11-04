@@ -61,13 +61,21 @@ router.get("/api/chatgpt-seasonal-demand", async (req, res) => {
     const answer = await askGemini(prompt);
     console.log("Gemini raw answer:", answer); // <-- Add this line
     const lines = answer.split('\n').map(l => l.trim()).filter(Boolean);
-    const firstLine = lines[0]?.toLowerCase();
+    const firstLine = (lines[0] || "").toLowerCase();
+
     let demand = false;
-    let recommendation = type === "market" ? "Recommended" : "Seasonal ↓";
-    if (type === "market" && firstLine.includes("yes")) demand = true;
-    if (type !== "market" && firstLine.includes("increase")) {
-      demand = true;
-      recommendation = "Seasonal ↑";
+    let recommendation = type === "market" ? "Trending ↑" : "Seasonal ↑";
+
+    if (type === "market") {
+      // yes/no only
+      demand = /\byes\b/.test(firstLine);
+      if (!demand) recommendation = "Not trending";
+    } else {
+      // exact "increase" only; explicitly handle negatives
+      const isNo = /\bno increase\b|\bno\b|\bdecrease\b|out of season/.test(firstLine);
+      const isInc = /^(increase|high|yes)\b/.test(firstLine);
+      demand = !isNo && isInc;
+      if (!demand) recommendation = "Seasonal ↓";
     }
     const reason = lines.slice(1).join(' ').trim();
     res.json({ demand, reason: reason || answer, recommendation });

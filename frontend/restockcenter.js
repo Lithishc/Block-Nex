@@ -4,7 +4,7 @@ import { collection, getDocs, doc, updateDoc, addDoc, query, where, getDoc, arra
 import { createNotification } from "./notifications-helper.js";
 import { showToast } from "./toast.js";
 // FIX: frontend helper modules live under ./frontend/functions
-import { getSeasonalDemand } from "./chatgpt-helper.js";
+import { getSeasonalDemand, getMarketDemand } from "./chatgpt-helper.js";
 import { getInventoryTrendPrediction } from "./ml-inventory-trend.js";
 import { generateStandardId } from "./id-utils.js";
 // Removed: import { acceptRestockOnChain } from "./functions/blockchain.js";
@@ -156,38 +156,48 @@ async function annotateAIDemandTags() {
   const rows = Array.from(tableBody.querySelectorAll('tr'));
 
   await Promise.all(rows.map(async (row) => {
-    // Use item name (column index 1)
     const itemNameCell = row.cells[1];
     if (!itemNameCell) return;
     const itemName = itemNameCell.textContent.trim();
     if (!itemName) return;
 
-    // Find the Request Qty cell (index 5)
     const requestQtyCell = row.cells[5];
     if (!requestQtyCell) return;
 
-    // Remove any existing AI/ML tags
     Array.from(requestQtyCell.querySelectorAll('.tag, .ai-demand-tag')).forEach(tag => tag.remove());
 
-    // Create the AI demand tag span
-    let aiTag = document.createElement('span');
+    // Fetch seasonal + market in parallel
+    let seasonal, market;
+    try {
+      [seasonal, market] = await Promise.all([
+        getSeasonalDemand(itemName),
+        getMarketDemand(itemName)
+      ]);
+    } catch {}
+
+    const showSeasonal = seasonal?.demand === true;
+    const showMarket = market?.demand === true;
+
+    // Only render when in demand/trending
+    if (!showSeasonal && !showMarket) return;
+
+    const aiTag = document.createElement('span');
     aiTag.className = 'ai-demand-tag';
     aiTag.style.marginLeft = '8px';
+    aiTag.style.fontWeight = 'bold';
+    aiTag.style.cursor = 'help';
 
-    // Fetch AI demand
-    try {
-      const data = await getSeasonalDemand(itemName);
-      if (data && typeof data.demand === "boolean") {
-        aiTag.textContent = data.demand ? "Increase" : "Decrease";
-        aiTag.title = data.reason || "";
-        aiTag.style.color = data.demand ? "#1db954" : "#d9534f";
-        aiTag.style.fontWeight = "bold";
-        aiTag.style.cursor = "help";
-        requestQtyCell.appendChild(aiTag);
-      }
-    } catch {
-      // Do not show anything if error
+    if (showSeasonal) {
+      aiTag.textContent = "Increase";
+      aiTag.title = seasonal?.reason || "";
+      aiTag.style.color = "#1db954";
+    } else {
+      aiTag.textContent = "Trending";
+      aiTag.title = market?.reason || "";
+      aiTag.style.color = "#1db954";
     }
+
+    requestQtyCell.appendChild(aiTag);
   }));
 }
 
