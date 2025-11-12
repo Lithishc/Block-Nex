@@ -1,0 +1,10 @@
+# Recommended npm packages (install in functions/ or project root as appropriate)
+express
+cors
+dotenv
+ethers
+hardhat
+@nomiclabs/hardhat-ethers
+firebase-admin
+@google/ai           # optional - Google Generative AI client (if used)
+http-server          # optional - local static server for frontend

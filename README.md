@@ -71,8 +71,6 @@ Block Nex/
 │   ├── supplier-details.html, supplier-details.css
 │   ├── navbar.html, navbar.css
 │   ├── loginstyle.css
-│   └── ...
-├── backend/
 │   ├── firebase-config.js
 │   ├── inventory.js
 │   ├── procurement.js
@@ -130,18 +128,103 @@ Screenshots coming soon!
 
 To run locally:
 
-1. Install [Node.js](https://nodejs.org/) (required for backend and AI features).
-2. Clone the repository:
-  ```bash
-  git clone https://github.com/Lithishc/Block-Nex.git
+Prerequisites (Windows)
+- Node.js (LTS) — https://nodejs.org/ — verify:
   ```
-3. Install dependencies (including dotenv):
-  ```bash
-  npm install dotenv
-  # or if using package.json:
-  npm install
+  node -v
+  npm -v
   ```
-4. Open the project folder in [Visual Studio Code](https://code.visualstudio.com/()).
+- Git
+- Firebase CLI (for hosting & Firestore rules):
+  ```
+  npm install -g firebase-tools
+  firebase login
+  ```
+
+1) Clone repo
+```
+git clone https://github.com/Lithishc/Block-Nex.git
+cd Block-Nex
+```
+
+2) Install dependencies
+- Backend (functions/):
+```
+cd .\functions
+npm install
+# if you don't have a package.json, install required packages:
+npm install express cors dotenv ethers hardhat @nomiclabs/hardhat-ethers firebase-admin
+```
+- Frontend: no build step required (static). If you add local npm packages for frontend tooling, run npm install in frontend/.
+
+3) Environment variables
+- Create functions/.env (do NOT commit this). Example keys:
+```
+# filepath: functions/.env (example)
+GEMINI_API_KEY=your_gemini_api_key
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_KEY
+PRIVATE_KEY=0x...
+CONTRACT_ADDRESS=0x...
+PORT=3000
+```
+- Add `.env` and `functions/.env` to .gitignore.
+
+4) ABI & artifacts
+- The frontend needs the contract ABI. Copy compiled ABI into the frontend functions folder:
+```
+# from repo root (PowerShell)
+cp .\artifacts\contracts\BlockNexSupply.sol\BlockNexSupply.json .\frontend\functions\abi\BlockNexSupply.json
+```
+- Do NOT commit full artifacts/ or node_modules/. Use .gitignore.
+
+5) Run backend API locally
+```
+cd .\functions
+node .\server.js
+# server should respond at http://localhost:3000/
+```
+- If you see "Cannot use import statement outside a module", ensure package.json has "type":"module" or run with Node settings matching ES module usage.
+
+6) Serve frontend locally
+- Option A (Live Server extension in VS Code): open `frontend/index.html` and run Live Server.
+- Option B (simple static server):
+```
+# from repo root
+npx http-server frontend -p 5500
+# open http://127.0.0.1:5500/index.html
+```
+
+7) Blockchain (compile & deploy)
+- Compile with Hardhat:
+```
+cd .\contracts (or repo root where hardhat.config.js lives)
+npx hardhat compile
+```
+- Deploy (example, adjust network and scripts):
+```
+npx hardhat run scripts/deploy.js --network sepolia
+# copy contract address to functions/.env CONTRACT_ADDRESS
+```
+
+8) Firebase Hosting (optional)
+```
+firebase init hosting
+# set public directory -> frontend
+firebase deploy --only hosting
+```
+- If hosting frontend on Firebase, update frontend API base (replace localhost) to your deployed backend URL.
+
+9) Troubleshooting
+- 404 for frontend imports: browser modules must be under the served frontend directory (e.g. frontend/functions/*). Ensure missing files are present there.
+- If accept-offer fails, check backend logs and Firestore update permissions.
+- Etherscan: view transaction at https://sepolia.etherscan.io/tx/<TX_HASH>
+
+---
+
+## 📦 Requirements (quick list)
+See `requirements.txt` for npm package recommendations.
+
+---
 
 ## License
 
