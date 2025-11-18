@@ -254,26 +254,41 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
   const procurementTx = order.blockchain?.txHash || order.blockchain?.procurementTx || order.procurementTx || null;
   const acceptTx = order.blockchain?.acceptTx || order.acceptTx || order.blockchain?.offerAcceptTx || order.acceptedOffer?.blockchain?.txHash || null;
 
-  contractSection = `
-    <div style="margin:16px 0;padding:12px;border:1px solid #aaa; border-radius: 20px;background:#f9f9f9;">
-      <h3>Digital Contract</h3>
-      <pre style="white-space:pre-wrap;font-size:0.95em;overflow-wrap:anywhere;word-break:break-all;">${contractText}</pre>
-      `;
+  // Show compact View/Download when both have signed; otherwise show full contract and sign controls
+  if (retailerSigned && supplierSigned) {
+    const inlineContractWithSigs = contractText + `\n\nRetailer Signed: ${retailerSigned ? "✅" : "❌"}\nSupplier Signed: ${supplierSigned ? "✅" : "❌"}`;
 
-  contractSection += `
-      <div style="margin:8px 0;">
-        <b>Retailer Signed:</b> ${retailerSigned ? "✅" : "❌"} <br>
-        <b>Supplier Signed:</b> ${supplierSigned ? "✅" : "❌"}
+    contractSection = `
+      <div style="margin:16px 0;padding:12px;border:1px solid #aaa; border-radius: 20px;background:#f9f9f9;">
+        <h3>Digital Contract</h3>
+        <div style="margin:8px 0 0 0; display:flex; gap:8px; align-items:center;">
+          <button id="view-contract-btn" class="pill-btn" style="margin-right:8px;">View Contract</button>
+          <button id="download-contract-btn">Download Certificate (.txt)</button>
+        </div>
+        <div id="contract-inline-text" style="display:none;margin-top:12px;">
+          <pre id="contract-inline-pre" style="white-space:pre-wrap;font-size:0.95em;overflow-wrap:anywhere;word-break:break-all;">${inlineContractWithSigs}</pre>
+        </div>
       </div>
-      <div style="margin:8px 0 0 0;">
-        ${canSign ? `<button id="sign-contract-btn" class="pill-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
-        ${canDownload ? `<button id="download-contract-btn">Download Certificate (.txt)</button>` : ""}
+    `;
+  } else {
+    contractSection = `
+      <div style="margin:16px 0;padding:12px;border:1px solid #aaa; border-radius: 20px;background:#f9f9f9;">
+        <h3>Digital Contract</h3>
+        <pre style="white-space:pre-wrap;font-size:0.95em;overflow-wrap:anywhere;word-break:break-all;">${contractText}</pre>
+        <div style="margin:8px 0;">
+          <b>Retailer Signed:</b> ${retailerSigned ? "✅" : "❌"} <br>
+          <b>Supplier Signed:</b> ${supplierSigned ? "✅" : "❌"}
+        </div>
+        <div style="margin:8px 0 0 0;">
+          ${canSign ? `<button id="sign-contract-btn" class="pill-btn" style="margin-right:8px;">Sign Contract</button>` : ""}
+          ${canDownload ? `<button id="download-contract-btn">Download Certificate (.txt)</button>` : ""}
+        </div>
+        <div style="color:#e0103a;font-size:0.95em;margin-top:6px;">
+          ${!retailerSigned ? "Retailer must sign first." : (!supplierSigned && isSupplier ? "Please sign to proceed." : "")}
+        </div>
       </div>
-      <div style="color:#e0103a;font-size:0.95em;margin-top:6px;">
-        ${!retailerSigned ? "Retailer must sign first." : (!supplierSigned && isSupplier ? "Please sign to proceed." : "")}
-      </div>
-    </div>
-  `;
+    `;
+  }
 
   // Only allow supplier to update status after both have signed
   let markFulfilledBtn = "";
@@ -332,6 +347,7 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
   setTimeout(() => {
     const signBtn = document.getElementById('sign-contract-btn');
     const downloadBtn = document.getElementById('download-contract-btn');
+    const viewBtn = document.getElementById('view-contract-btn');
     if (signBtn) {
       signBtn.onclick = async () => {
         const currentUid = auth.currentUser?.uid || uid;
@@ -398,6 +414,24 @@ ${supplier?.sig ?? "-"}`;
           alert("Could not fetch latest signatures. Please refresh and try again.");
         }
       };
+    }
+    if (viewBtn) {
+      viewBtn.onclick = () => {
+        const el = document.getElementById('contract-inline-text');
+        if (!el) return;
+        if (el.style.display === 'none' || el.style.display === '') {
+          el.style.display = 'block';
+          viewBtn.textContent = 'Hide Contract';
+        } else {
+          el.style.display = 'none';
+          viewBtn.textContent = 'View Contract';
+        }
+      };
+      // Ensure inline pre contains latest signature markers in case signatures changed since popup build
+      const pre = document.getElementById('contract-inline-pre');
+      if (pre) {
+        pre.textContent = contractText + "\n\nRetailer Signed: " + (retailerSigned ? "✅" : "❌") + "\nSupplier Signed: " + (supplierSigned ? "✅" : "❌");
+      }
     }
   }, 100);
 };
