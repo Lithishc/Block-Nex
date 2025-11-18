@@ -53,6 +53,39 @@
   color: #00796b;
 }
 
+/* Clickable order link styled as a chip (no blue underline) */
+.order-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: #e9efff; /* softer pale-blue */
+  color: #1973e9; /* blue text for contrast */
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(10,79,169,0.08);
+  transition: background 0.15s ease, transform 0.06s ease, box-shadow 0.12s ease;
+  border: 1px solid rgba(10,79,169,0.06);
+}
+.order-link:hover {
+  background: #d7e9ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(10,79,169,0.12);
+}
+.order-link:focus {
+  outline: 3px solid rgba(10,79,169,0.12);
+  outline-offset: 2px;
+}
+.order-link::after {
+  content: "↗"; /* small chevron indicating clickability */
+  margin-left: 0; /* gap handled by flex gap */
+  font-size: 0.95em;
+  opacity: 0.85;
+  transform: none;
+}
+
 
 /* Popup overlay */
 #order-tracking-popup {
