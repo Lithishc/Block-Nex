@@ -14,7 +14,11 @@ async function getSupplierGSTIN(supplierUid) {
   return "";
 }
 
-function generateContractText(order, dealerGSTIN, supplierGSTIN) {
+function generateContractText(order, retailerGSTIN, supplierGSTIN) {
+  // Prefer transaction hashes only; do NOT show numeric IDs as a fallback.
+  const procurementTx = order.blockchain?.txHash || order.blockchain?.procurementTx || order.procurementTx || null;
+  const acceptTx = order.blockchain?.acceptTx || order.acceptTx || order.blockchain?.offerAcceptTx || order.acceptedOffer?.blockchain?.txHash || null;
+
   return `Digital Supply Contract
 
 Order ID: ${order.globalOrderId || "-"}
@@ -22,7 +26,10 @@ Item: ${order.itemName}
 Quantity: ${order.quantity}
 Supplier: ${order.supplier}
 Supplier GSTIN: ${supplierGSTIN}
-Dealer GSTIN: ${dealerGSTIN}
+Retailer: ${order.retailer || order.retailerName || "-"}
+Retailer GSTIN: ${retailerGSTIN}
+Procurement (on-chain) Tx: ${procurementTx || "-"}
+Accepted Offer (on-chain) Tx: ${acceptTx || "-"}
 Price: Rs.${order.price}
 Details: ${order.details}
 Date: ${(order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt)).toLocaleString()}
@@ -82,7 +89,7 @@ async function loadOrders(uid) {
 
     // Pull latest status from globalOrders (authoritative)
     let latestStatus = order.status || "-";
-    let dealerSigned = false, supplierSigned = false;
+    let retailerSigned = false, supplierSigned = false;
     try {
       if (orderId) {
         const gSnap = await getDoc(doc(db, "globalOrders", orderId));
@@ -92,7 +99,7 @@ async function loadOrders(uid) {
 
           // Check digital contract signatures
           const sigs = g.contractSignatures || {};
-          dealerSigned = !!(sigs.dealer && sigs.dealer.sig);
+          retailerSigned = !!(sigs.retailer && sigs.retailer.sig);
           supplierSigned = !!(sigs.supplier && sigs.supplier.sig);
         }
       }
@@ -101,7 +108,7 @@ async function loadOrders(uid) {
     }
 
     // Show "Contract Sign Awaiting" until both parties sign
-    const displayStatus = (dealerSigned && supplierSigned) ? latestStatus : "Contract Sign Awaiting";
+    const displayStatus = (retailerSigned && supplierSigned) ? latestStatus : "Contract Sign Awaiting";
 
     let statusCell = `
       <span class="status-text">${displayStatus}</span>
@@ -211,44 +218,44 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
   let contractSection = "";
   let canSign = false;
   let canDownload = false;
-  let dealerSigned = false;
+  let retailerSigned = false;
   let supplierSigned = false;
   let contractText = "";
-  let dealerGSTIN = order.dealerGSTIN || "";
+  let retailerGSTIN = order.retailerGSTIN || "";
   let supplierGSTIN = order.supplierGSTIN || "";
   let contractSignatures = order.contractSignatures || {};
   let currentUserUid = uid;
-  let isDealer = (order.dealerUid === currentUserUid);
+  let isRetailer = (order.retailerUid === currentUserUid);
   let isSupplier = (order.supplierUid === currentUserUid);
 
   // Try to get GSTINs if not present
-  if (!dealerGSTIN && order.dealerUid) {
-    dealerGSTIN = order.dealerUid;
+  if (!retailerGSTIN && order.retailerUid) {
+    retailerGSTIN = order.retailerUid;
   }
   if (!supplierGSTIN && order.supplierUid) {
     supplierGSTIN = await getSupplierGSTIN(order.supplierUid);
   }
 
-  contractText = generateContractText(order, dealerGSTIN, supplierGSTIN);
-  dealerSigned = !!(contractSignatures && contractSignatures.dealer && contractSignatures.dealer.sig);
+  contractText = generateContractText(order, retailerGSTIN, supplierGSTIN);
+  retailerSigned = !!(contractSignatures && contractSignatures.retailer && contractSignatures.retailer.sig);
   supplierSigned = !!(contractSignatures && contractSignatures.supplier && contractSignatures.supplier.sig);
 
-  // Dealer signs first, then supplier
-  if (isDealer && !dealerSigned) {
+  // Retailer signs first, then supplier
+  if (isRetailer && !retailerSigned) {
     canSign = true;
-  } else if (isSupplier && dealerSigned && !supplierSigned) {
+  } else if (isSupplier && retailerSigned && !supplierSigned) {
     canSign = true;
   }
-  if (dealerSigned && supplierSigned) {
+  if (retailerSigned && supplierSigned) {
     canDownload = true;
   }
 
   contractSection = `
     <div style="margin:16px 0;padding:12px;border:1px solid #aaa; border-radius: 20px;background:#f9f9f9;">
       <h3>Digital Contract</h3>
-      <pre style="white-space:pre-wrap;font-size:0.95em;">${contractText}</pre>
+      <pre style="white-space:pre-wrap;font-size:0.95em;overflow-wrap:anywhere;word-break:break-all;">${contractText}</pre>
       <div style="margin:8px 0;">
-        <b>Dealer Signed:</b> ${dealerSigned ? "✅" : "❌"} <br>
+        <b>Retailer Signed:</b> ${retailerSigned ? "✅" : "❌"} <br>
         <b>Supplier Signed:</b> ${supplierSigned ? "✅" : "❌"}
       </div>
       <div style="margin:8px 0 0 0;">
@@ -256,14 +263,14 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
         ${canDownload ? `<button id="download-contract-btn">Download Certificate (.txt)</button>` : ""}
       </div>
       <div style="color:#e0103a;font-size:0.95em;margin-top:6px;">
-        ${!dealerSigned ? "Dealer must sign first." : (!supplierSigned && isSupplier ? "Please sign to proceed." : "")}
+        ${!retailerSigned ? "Retailer must sign first." : (!supplierSigned && isSupplier ? "Please sign to proceed." : "")}
       </div>
     </div>
   `;
 
   // Only allow supplier to update status after both have signed
   let markFulfilledBtn = "";
-  if ((status === "delivered" || status === "Delivered") && globalProcurementId && dealerSigned && supplierSigned) {
+  if ((status === "delivered" || status === "Delivered") && globalProcurementId && retailerSigned && supplierSigned) {
     markFulfilledBtn = `
       <div style="margin-top:14px;">
         <button class="pill-btn accept" onclick="window.markProcurementFulfilled('${uid}','${globalOrderId}','${globalProcurementId}')">
@@ -325,14 +332,14 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
         const { signature, keyVersion } = await signWithNewKey(currentUid, contractText);
         const payload = { v: keyVersion, sig: signature };
 
-        if (isDealer) {
-          const success = await saveContractSignature(globalOrderId, 'dealer', payload);
+        if (isRetailer) {
+          const success = await saveContractSignature(globalOrderId, 'retailer', payload);
           if (success) {
             if (order.supplierUid) {
               await createNotification(order.supplierUid, {
                 type: "contract_sign",
-                title: "Dealer Signed Contract",
-                body: "Dealer has signed the contract. Please review and sign.",
+                title: "Retailer Signed Contract",
+                body: "Retailer has signed the contract. Please review and sign.",
                 related: { globalOrderId }
               });
             }
@@ -341,8 +348,8 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
         } else if (isSupplier) {
           const success = await saveContractSignature(globalOrderId, 'supplier', payload);
           if (success) {
-            if (order.dealerUid) {
-              await createNotification(order.dealerUid, {
+            if (order.retailerUid) {
+              await createNotification(order.retailerUid, {
                 type: "contract_sign",
                 title: "Supplier Signed Contract",
                 body: "Supplier has signed the contract.",
@@ -361,17 +368,17 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
           const latestSnap = await getDoc(doc(db, "globalOrders", globalOrderId));
           const latest = latestSnap.exists() ? latestSnap.data() : order;
           const sigs = latest.contractSignatures || {};
-          const dealer = sigs.dealer || null;
+          const retailer = sigs.retailer || null;
           const supplier = sigs.supplier || null;
 
           const certText =
             contractText +
             `
 
-Dealer Signature (v:${dealer?.v ?? "-" }):
-${dealer?.sig ?? "-"}
+Retailer Signature (v:${retailer?.v ?? "-" }):
+${retailer?.sig ?? "-"}
 
-Supplier Signature (v:${supplier?.v ?? "-" }):
+Supplier Signature (v:${supplier?.v ?? "-"}):
 ${supplier?.sig ?? "-"}`;
 
           downloadText(`Order_${globalOrderId}_Certificate.txt`, certText);

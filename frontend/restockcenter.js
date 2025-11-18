@@ -335,6 +335,7 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
 
     // On-chain accept
     const procurementId = Number((userReq.blockchain || globalReq.blockchain || {}).procurementId || 0);
+    const procurementTx = (userReq.blockchain || globalReq.blockchain || {}).txHash || null;
     const offerIdOnChain = Number((offer.blockchain || {}).offerId || 0);
     if (!procurementId || !offerIdOnChain) throw new Error("Missing blockchain IDs");
 
@@ -376,9 +377,17 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
     const qty = Number(userReq.requestedQty || userReq.presetQty || 0);
     const priceNum = Number(acceptedOffer.price || 0);
 
-    // GSTINs (best effort)
-    let dealerGSTIN = "";
-    try { const inf = await getDoc(doc(db, "info", uid)); dealerGSTIN = inf.exists() ? (inf.data().gstNumber || "") : ""; } catch {}
+    // GSTINs and retailer display name (best effort)
+    let retailerGSTIN = "";
+    let retailerName = "";
+    try {
+      const inf = await getDoc(doc(db, "info", uid));
+      if (inf.exists()) {
+        const d = inf.data() || {};
+        retailerGSTIN = d.gstNumber || "";
+        retailerName = d.companyName || d.displayName || d.name || "";
+      }
+    } catch {}
     let supplierGSTIN = "";
     try {
       if (acceptedOffer.supplierUid) {
@@ -395,7 +404,9 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
       offerId: acceptedOffer.offerId || null,
 
       // Parties
-      dealerUid: uid,
+      retailerUid: uid,
+      retailerName: retailerName || "",
+      retailer: retailerName || "",
       supplierUid: acceptedOffer.supplierUid || null,
 
       // Business fields (for UI/contract)
@@ -412,7 +423,7 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
       createdAt: new Date(),
 
       // Contract/signatures
-      dealerGSTIN,
+      retailerGSTIN,
       supplierGSTIN,
       contractSignatures: {},
 
@@ -428,16 +439,19 @@ window.acceptOffer = async (uid, globalProcurementId, userRequestId, offerIdx) =
       blockchain: {
         network: "sepolia",
         procurementId,
+        txHash: procurementTx,
         offerId: offerIdOnChain,
         acceptTx: j.txHash
       }
     };
 
+    // Backwards-compatible top-level field used by some views
+    if (procurementTx) orderDoc.procurementTx = procurementTx;
+
     // Persist: global + buyer + supplier
     await setDoc(doc(db, "globalOrders", orderId), orderDoc, { merge: true });
     await setDoc(doc(db, "users", uid, "orders", orderId), { ...orderDoc, role: "buyer" }, { merge: true });
     if (acceptedOffer.supplierUid) {
-      await setDoc(doc(db, "users", acceptedOffer.supplierUid, "orders", orderId), { ...orderDoc, role: "supplier" }, { merge: true });
       await setDoc(doc(db, "users", acceptedOffer.supplierUid, "orderFulfilment", orderId), { ...orderDoc, role: "supplier" }, { merge: true });
     }
 

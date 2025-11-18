@@ -17,11 +17,11 @@ async function waitForEvent(txHash, expectedEvent, timeoutMs = 120000, intervalM
   throw new Error("Timeout waiting for confirmation");
 }
 
-export async function createRestockOnChain({ dealerUid, skuId, qty }) {
+export async function createRestockOnChain({ retailerUid, skuId, qty }) {
   const r = await fetch(`${API_BASE}/api/bc/procurements?fast=1`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dealerUid, skuId, qty: Number(qty), fast: 1 }),
+    body: JSON.stringify({ retailerUid, skuId, qty: Number(qty), fast: 1 }),
   });
   const j = await r.json();
   if (!r.ok || !j.txHash) throw new Error(j.error || "Blockchain error");

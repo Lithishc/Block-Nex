@@ -1,6 +1,6 @@
 # 🚀 Block Nex (In Development)
 
-A modern, web-based **Block Nex (Supply Chain Management System)** designed to automate inventory tracking, procurement, and supplier-dealer interactions — with advanced AI-powered analytics and planned integration of blockchain and digital certificate contracts for transparency, traceability, and trust.
+A modern, web-based **Block Nex (Supply Chain Management System)** designed to automate inventory tracking, procurement, and supplier-retailer interactions — with advanced AI-powered analytics and planned integration of blockchain and digital certificate contracts for transparency, traceability, and trust.
 
 > 🎓 **Final Year B.E. Project (2025)**  
 > Developed as part of the Bachelor of Engineering (B.E.) curriculum for academic submission and research.  
@@ -10,24 +10,24 @@ A modern, web-based **Block Nex (Supply Chain Management System)** designed to a
 
 ## 🔧 Features
 
-### 👨‍💼 Dealer Module
+### 👨‍💼 Retailer Module
 - Add, edit, and manage inventory items
 - Set preset reorder levels per item
 - Auto-generate procurement requests when stock falls below thresholds
 - **AI-powered inventory trend analysis:**  
-  Automatically analyzes inventory history to suggest if an item is high-selling or low-selling, helping dealers adjust procurement quantities.
+  Automatically analyzes inventory history to suggest if an item is high-selling or low-selling, helping retailers adjust procurement quantities.
 - View supplier offers and accept/reject them
 - Track order status and update inventory on fulfillment
 
 ### 🤝 Supplier Module
-- View open procurement requests from dealers
+- View open procurement requests from retailers
 - Submit competitive offers with pricing and details
 - Receive orders automatically upon offer acceptance
 
 ### 📦 Order Management
 - Orders auto-generated upon offer acceptance
-- Track orders for both dealers and suppliers
-- Dealers can mark orders as fulfilled and update stock
+- Track orders for both retailers and suppliers
+- Retailers can mark orders as fulfilled and update stock
 
 ### 🔔 Notification System
 - Real-time notifications for procurement, offers, and orders

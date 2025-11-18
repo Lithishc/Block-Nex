@@ -69,12 +69,12 @@ router.get("/api/bc/receipt/:hash", async (req, res) => {
 // POST /api/bc/procurements[?fast=1]
 router.post("/api/bc/procurements", async (req, res) => {
   try {
-    const { dealerUid, skuId, qty } = req.body || {};
-    if (!dealerUid || !skuId || qty === undefined) {
-      return res.status(400).json({ error: "Missing fields: dealerUid, skuId, qty" });
+    const { retailerUid, skuId, qty } = req.body || {};
+    if (!retailerUid || !skuId || qty === undefined) {
+      return res.status(400).json({ error: "Missing fields: retailerUid, skuId, qty" });
     }
     const fast = String(req.query.fast || req.body.fast || "") === "1";
-    const tx = await contract.createProcurement(String(dealerUid), String(skuId), Number(qty));
+    const tx = await contract.createProcurement(String(retailerUid), String(skuId), Number(qty));
     if (fast) return res.json({ ok: true, txHash: tx.hash });
     const rcpt = await tx.wait();
     const parsed = parseReceiptFor(contract.interface, rcpt);

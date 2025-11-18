@@ -207,17 +207,17 @@ async function loadInventory(uid) {
             const qtyToRequest = requestQty > 0 ? requestQty : presetQty;
 
             // Read company/location (unchanged)
-            let dealerCompanyName = "";
-            let dealerAddress = "";
-            let dealerLocation = "";
+            let retailerCompanyName = "";
+            let retailerAddress = "";
+            let retailerLocation = "";
             try {
               const infoRef = doc(db, "info", auth.currentUser.uid);
               const infoSnap = await getDoc(infoRef);
               if (infoSnap.exists()) {
                 const info = infoSnap.data();
-                dealerCompanyName = info.companyName || "";
-                dealerAddress = info.companyAddress || "";
-                dealerLocation = info.location || "";
+                retailerCompanyName = info.companyName || "";
+                retailerAddress = info.companyAddress || "";
+                retailerLocation = info.location || "";
               }
             } catch (err) {
               console.warn("Supplier details not found:", err);
@@ -227,7 +227,7 @@ async function loadInventory(uid) {
             let chain;
             try {
               chain = await createRestockOnChain({
-                dealerUid: auth.currentUser.uid,
+                retailerUid: auth.currentUser.uid,
                 skuId: item.itemID,
                 qty: qtyToRequest
               });
@@ -246,9 +246,9 @@ async function loadInventory(uid) {
               status: "open",
               supplierResponses: [],
               userUid: auth.currentUser.uid,
-              dealerCompanyName,
-              dealerAddress,
-              location: dealerLocation || dealerAddress || "",
+              retailerCompanyName,
+              retailerAddress,
+              location: retailerLocation || retailerAddress || "",
               createdAt: new Date(),
               fulfilled: false,
               blockchain: {

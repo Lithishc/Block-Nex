@@ -15,19 +15,19 @@ function parseContractText(raw) {
   const contractMatch = text.match(/Digital Supply Contract[\s\S]*By signing, both parties agree to the above terms\./);
 
   // Tolerant patterns (accept optional version and any spacing/newlines)
-  const dealerMatch = text.match(/Dealer Signature\s*(?:\(v:\s*([0-9-]+)\s*\))?\s*:\s*([\s\S]*?)(?:\n{2,}|\r?\nSupplier Signature|\r?\n$)/i);
+  const retailerMatch = text.match(/Retailer Signature\s*(?:\(v:\s*([0-9-]+)\s*\))?\s*:\s*([\s\S]*?)(?:\n{2,}|\r?\nSupplier Signature|\r?\n$)/i);
   const supplierMatch = text.match(/Supplier Signature\s*(?:\(v:\s*([0-9-]+)\s*\))?\s*:\s*([\s\S]*?)$/i);
 
-  const dealerSignature = (dealerMatch ? dealerMatch[2] : "").replace(/\s+/g, "").trim();
-  const dealerKeyVersion = dealerMatch && dealerMatch[1] && dealerMatch[1] !== "-" ? dealerMatch[1].trim() : null;
+  const retailerSignature = (retailerMatch ? retailerMatch[2] : "").replace(/\s+/g, "").trim();
+  const retailerKeyVersion = retailerMatch && retailerMatch[1] && retailerMatch[1] !== "-" ? retailerMatch[1].trim() : null;
 
   const supplierSignature = (supplierMatch ? supplierMatch[2] : "").replace(/\s+/g, "").trim();
   const supplierKeyVersion = supplierMatch && supplierMatch[1] && supplierMatch[1] !== "-" ? supplierMatch[1].trim() : null;
 
   return {
     contractText: contractMatch ? contractMatch[0].trim() : "",
-    dealerSignature,
-    dealerKeyVersion,
+    retailerSignature,
+    retailerKeyVersion,
     supplierSignature,
     supplierKeyVersion
   };
@@ -45,7 +45,7 @@ function parseContractFields(contractText) {
     quantity: get(/Quantity:\s*([0-9]+)/),
     supplier: get(/Supplier:\s*(.+)/),
     supplierGSTIN: get(/Supplier GSTIN:\s*(.+)/),
-    dealerGSTIN: get(/Dealer GSTIN:\s*(.+)/),
+    retailerGSTIN: get(/Retailer GSTIN:\s*(.+)/),
     price: get(/Price:\s*Rs\.?(\d+(?:\.\d+)?)/),
     details: get(/Details:\s*(.*)/)
   };
@@ -109,7 +109,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // Parse signatures and contract text
-    const { contractText, dealerSignature, dealerKeyVersion, supplierSignature, supplierKeyVersion } = parseContractText(rawText);
+    const { contractText, retailerSignature, retailerKeyVersion, supplierSignature, supplierKeyVersion } = parseContractText(rawText);
     const fields = parseContractFields(contractText);
     const orderId = fields.orderId;
     if (!orderId) {
@@ -129,7 +129,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 1) Signature validity (key-only, same as before)
-    const dealerValid = await isKeyOnlyValid(order.dealerUid, dealerSignature, dealerKeyVersion);
+    const retailerValid = await isKeyOnlyValid(order.retailerUid, retailerSignature, retailerKeyVersion);
     const supplierValid = await isKeyOnlyValid(order.supplierUid, supplierSignature, supplierKeyVersion);
 
     // 2) Cross-verify contract details (string compare; does not affect Valid/Invalid)
@@ -143,14 +143,14 @@ window.addEventListener('DOMContentLoaded', () => {
     detailsChecks.push(compare(fields.price, order.price));
     detailsChecks.push(compare(fields.details, order.details));
     // GSTINs if present on order
-    if (order.dealerGSTIN) detailsChecks.push(compare(fields.dealerGSTIN, order.dealerGSTIN));
+    if (order.retailerGSTIN) detailsChecks.push(compare(fields.retailerGSTIN, order.retailerGSTIN));
     if (order.supplierGSTIN) detailsChecks.push(compare(fields.supplierGSTIN, order.supplierGSTIN));
 
     const detailsMatch = detailsChecks.every(Boolean);
 
     // Render result (signatures Valid/Invalid; details Match/Mismatch)
     let html = `<div class='verify-label'>Order ID:</div> ${orderId}<br>`;
-    html += `<div class='verify-label'>Dealer Signature:</div> ${dealerValid ? "<span class='verify-success'>Valid</span>" : "<span class='verify-fail'>Invalid</span>"}<br>`;
+    html += `<div class='verify-label'>Retailer Signature:</div> ${retailerValid ? "<span class='verify-success'>Valid</span>" : "<span class='verify-fail'>Invalid</span>"}<br>`;
     html += `<div class='verify-label'>Supplier Signature:</div> ${supplierValid ? "<span class='verify-success'>Valid</span>" : "<span class='verify-fail'>Invalid</span>"}<br>`;
     html += `<div class='verify-label'>Contract Details:</div> ${detailsMatch ? "<span class='verify-success'>Match</span>" : "<span class='verify-fail'>Mismatch</span>"}<br>`;
 

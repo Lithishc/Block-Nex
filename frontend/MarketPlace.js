@@ -57,18 +57,18 @@ async function loadOpenRequests(supplierUid) {
   for (const docSnap of reqSnap.docs) {
     const req = docSnap.data();
     if (req.status === "open" && req.userUid !== supplierUid) {
-      const dealerName =
-        req.dealerCompanyName ||
+      const retailerName =
+        req.retailerCompanyName ||
         req.companyName ||
         req.requesterCompanyName ||
-        req.dealerName ||
+        req.retailerName ||
         req.name ||
         req.username ||
-        (req.userUid ? `User ${req.userUid.slice(0, 6)}` : "Unknown Dealer");
+        (req.userUid ? `User ${req.userUid.slice(0, 6)}` : "Unknown Retailer");
 
       const locAddr = [
         req.location,
-        req.dealerAddress,
+        req.retailerAddress,
         req.companyAddress,
         req.address
       ].filter(v => v && String(v).trim().length).join(", ") || "N/A";
@@ -101,7 +101,7 @@ async function loadOpenRequests(supplierUid) {
             <span class="recommend-placeholder"></span>
           </div>
           <div class="deal-meta"><span><b>Requested Qty:</b> ${req.requestedQty}</span></div>
-          <div class="deal-meta"><span><b>Requested By:</b> ${dealerName}</span></div>
+          <div class="deal-meta"><span><b>Requested By:</b> ${retailerName}</span></div>
           <div class="deal-meta"><span><b>Location/Address:</b> ${locAddr}</span></div>
         </div>
         <button class="pill-btn" onclick="window.showOfferPopup('${docSnap.id}')">Send Offer</button>
@@ -228,21 +228,21 @@ document.getElementById('offer-form').addEventListener('submit', async function 
     await setDoc(doc(db, "users", supplierUid, "offers", offerId), offerData);
     await updateDoc(reqRef, { supplierResponses: arrayUnion(offerData) });
 
-    const dealerUid = reqData.userUid;
+    const retailerUid = reqData.userUid;
     const userReqQuery = query(
-      collection(db, "users", dealerUid, "procurementRequests"),
+      collection(db, "users", retailerUid, "procurementRequests"),
       where("globalProcurementId", "==", currentReqId),
       where("status", "==", "open")
     );
     const userReqSnap = await getDocs(userReqQuery);
     for (const userDoc of userReqSnap.docs) {
       await updateDoc(
-        doc(db, "users", dealerUid, "procurementRequests", userDoc.id),
+        doc(db, "users", retailerUid, "procurementRequests", userDoc.id),
         { supplierResponses: arrayUnion(offerData) }
       );
     }
 
-    await createNotification(dealerUid, {
+    await createNotification(retailerUid, {
       type: "offer_received",
       title: "New Offer Received",
       body: `${supplierName} offered ₹${price} for ${reqData.itemName}`,
