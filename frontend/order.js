@@ -250,10 +250,17 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
     canDownload = true;
   }
 
+  // Compute tx hashes (used for explorer links placed outside the DS box)
+  const procurementTx = order.blockchain?.txHash || order.blockchain?.procurementTx || order.procurementTx || null;
+  const acceptTx = order.blockchain?.acceptTx || order.acceptTx || order.blockchain?.offerAcceptTx || order.acceptedOffer?.blockchain?.txHash || null;
+
   contractSection = `
     <div style="margin:16px 0;padding:12px;border:1px solid #aaa; border-radius: 20px;background:#f9f9f9;">
       <h3>Digital Contract</h3>
       <pre style="white-space:pre-wrap;font-size:0.95em;overflow-wrap:anywhere;word-break:break-all;">${contractText}</pre>
+      `;
+
+  contractSection += `
       <div style="margin:8px 0;">
         <b>Retailer Signed:</b> ${retailerSigned ? "✅" : "❌"} <br>
         <b>Supplier Signed:</b> ${supplierSigned ? "✅" : "❌"}
@@ -293,6 +300,10 @@ window.showTracking = async (uid, globalOrderId, globalProcurementId) => {
       <div id="contract-section">
         ${contractSection}
       </div>
+      ${ (procurementTx || acceptTx) ? `<div style="margin:8px 0;display:flex;gap:8px;flex-wrap:wrap;">
+              ${procurementTx ? `<button class="pill-btn" style="background:#E7F1FF;color:#0B5ED7;border:none;box-shadow:none;padding:8px 14px;border-radius:20px;" title="Verify on Sepolia (opens new tab)" onclick="window.open('https://sepolia.etherscan.io/tx/${procurementTx}','_blank')">Verify Procurement Tx</button>` : ''}
+              ${acceptTx ? `<button class="pill-btn" style="background:#E7F1FF;color:#0B5ED7;border:none;box-shadow:none;padding:8px 14px;border-radius:20px;" title="Verify on Sepolia (opens new tab)" onclick="window.open('https://sepolia.etherscan.io/tx/${acceptTx}','_blank')">Verify Accept Tx</button>` : ''}
+        </div>` : ''}
       <h3>Updates:</h3>
       <table>
         <thead>
