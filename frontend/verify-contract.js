@@ -47,7 +47,9 @@ function parseContractFields(contractText) {
     supplierGSTIN: get(/Supplier GSTIN:\s*(.+)/),
     retailerGSTIN: get(/Retailer GSTIN:\s*(.+)/),
     price: get(/Price:\s*Rs\.?(\d+(?:\.\d+)?)/),
-    details: get(/Details:\s*(.*)/)
+    details: get(/Details:\s*(.*)/),
+    procurementTx: get(/Procurement \(on-chain\) Tx:\s*(0x[0-9a-fA-F]+)/),
+    acceptedOfferTx: get(/Accepted Offer \(on-chain\) Tx:\s*(0x[0-9a-fA-F]+)/)
   };
 }
 
@@ -145,6 +147,11 @@ window.addEventListener('DOMContentLoaded', () => {
     // GSTINs if present on order
     if (order.retailerGSTIN) detailsChecks.push(compare(fields.retailerGSTIN, order.retailerGSTIN));
     if (order.supplierGSTIN) detailsChecks.push(compare(fields.supplierGSTIN, order.supplierGSTIN));
+    // Compare on-chain tx hashes (use authoritative order fields)
+    const orderProcurementTx = order.blockchain?.txHash || order.blockchain?.procurementTx || order.procurementTx || "";
+    const orderAcceptTx = order.blockchain?.acceptTx || order.acceptTx || order.blockchain?.offerAcceptTx || (order.acceptedOffer && order.acceptedOffer.blockchain && order.acceptedOffer.blockchain.txHash) || "";
+    detailsChecks.push(compare(fields.procurementTx, orderProcurementTx));
+    detailsChecks.push(compare(fields.acceptedOfferTx, orderAcceptTx));
 
     const detailsMatch = detailsChecks.every(Boolean);
 
