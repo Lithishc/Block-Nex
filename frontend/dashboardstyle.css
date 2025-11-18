@@ -6,6 +6,29 @@ body {
   min-height: 100vh;
 }
 
+/* Center main page content vertically and horizontally */
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* bring the welcome a little higher on the page */
+  justify-content: flex-start;
+  text-align: center;
+  min-height: calc(100vh - 120px);
+  padding: 60px 16px 40px 16px;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+/* Student note styling: readable, human, not technical */
+.student-note {
+  max-width: 920px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #123047;
+  margin: 8px 12px 0 12px;
+}
+
 h1 {
   text-align: center;
   font-size: 2.5rem;
