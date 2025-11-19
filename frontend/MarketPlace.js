@@ -93,12 +93,16 @@ async function loadOpenRequests(supplierUid) {
       const card = document.createElement('div');
       card.className = 'deal-card';
       card.dataset.reqId = docSnap.id;
+
+      // Insert inventory-based recommendation immediately if present, otherwise keep placeholder
+      const recommendHtml = recTagHtml || `<span class="recommend-placeholder"></span>`;
+
       card.innerHTML = `
         <div class="deal-details">
           <div class="deal-title">
             ${req.itemName}
             <span class="seasonal-placeholder"></span>
-            <span class="recommend-placeholder"></span>
+            ${recommendHtml}
           </div>
           <div class="deal-meta"><span><b>Requested Qty:</b> ${req.requestedQty}</span></div>
           <div class="deal-meta"><span><b>Requested By:</b> ${retailerName}</span></div>

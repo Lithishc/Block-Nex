@@ -201,7 +201,28 @@ window.markProcurementFulfilled = async (uid, globalOrderId, globalProcurementId
     await updateDoc(doc(db, "users", uid, "orders", orderDoc.id), { status: "fulfilled", fulfilledAt: new Date() });
   }
   window.showTracking(uid, globalOrderId, globalProcurementId);
-  createNotification("Procurement marked completed and inventory updated", "success");
+
+  try {
+    const gSnap = await getDoc(doc(db, "globalOrders", globalOrderId));
+    if (gSnap.exists()) {
+      const g = gSnap.data();
+      const recipients = [];
+      if (g.retailerUid) recipients.push(g.retailerUid);
+      if (g.supplierUid && !recipients.includes(g.supplierUid)) recipients.push(g.supplierUid);
+
+      await Promise.all(recipients.map(r =>
+        createNotification(r, {
+          type: "procurement_fulfilled",
+          title: "Procurement marked Fulfilled",
+          body: "Inventory updated successfully",
+          related: { globalOrderId, globalProcurementId }
+        })
+      ));
+    }
+  } catch (e) {
+    console.warn("Failed to send fulfillment notifications", e);
+  }
+
   loadOrders(uid);
 };
 
